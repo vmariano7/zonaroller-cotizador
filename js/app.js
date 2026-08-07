@@ -131,6 +131,16 @@ async function arrancar() {
   });
 
   if ('serviceWorker' in navigator) {
+    // Si ya había una versión instalada y llega una nueva, recargamos una sola
+    // vez. Sin esto la primera apertura después de una actualización sigue
+    // mostrando la versión vieja.
+    const habiaVersionPrevia = !!navigator.serviceWorker.controller;
+    let recargando = false;
+    navigator.serviceWorker.addEventListener('controllerchange', () => {
+      if (!habiaVersionPrevia || recargando) return;
+      recargando = true;
+      location.reload();
+    });
     navigator.serviceWorker.register('./sw.js').catch(() => {});
   }
 }
