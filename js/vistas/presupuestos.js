@@ -2,7 +2,7 @@
 
 import { estado, guardar, borrar, obtener, proximoNumero } from '../store.js';
 import { calcularTotales } from '../calc.js';
-import { plata, num, fecha, esc, aviso, confirmar, chip, vacio, ESTADOS_PRESUPUESTO, sumarDias } from '../ui.js';
+import { plata, num, fecha, esc, aviso, confirmar, chip, vacio, ajuste, ESTADOS_PRESUPUESTO, sumarDias } from '../ui.js';
 import { navegar } from '../router.js';
 import { imprimirPresupuesto } from '../pdf.js';
 import { crearPedidoDesdePresupuesto } from './pedidos.js';
@@ -147,7 +147,7 @@ export function renderDetalle(contenedor, params) {
       </div>
       <div class="totales mt-16" style="max-width:320px;margin-left:auto">
         <div><span>Subtotal</span><strong>${plata(t.subtotal)}</strong></div>
-        ${t.montoDescuento ? `<div><span>Descuento ${num(t.descuentoPct, 0)}%</span><strong>− ${plata(t.montoDescuento)}</strong></div>` : ''}
+        ${ajuste(t) ? `<div><span>${esc(ajuste(t).etiqueta)}</span><strong>${esc(ajuste(t).monto)}</strong></div>` : ''}
         ${t.montoIva ? `<div><span>IVA ${num(t.ivaPct, 0)}%</span><strong>${plata(t.montoIva)}</strong></div>` : ''}
         <div class="total"><span>Total</span><span>${plata(t.total)}</span></div>
         <div class="mini" style="margin-top:.5rem"><span>Ganancia estimada</span><span>${plata(t.ganancia)}</span></div>

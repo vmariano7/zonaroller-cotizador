@@ -2,7 +2,7 @@
 
 import { TIPOS, SISTEMAS, itemVacio, calcularItem, calcularTotales, sistemaAuto, hayPreciosCargados } from '../calc.js';
 import { estado } from '../store.js';
-import { el, esc, plata, num, leerNumero, hoyISO } from '../ui.js';
+import { el, esc, plata, num, leerNumero, hoyISO, ajuste } from '../ui.js';
 import { sugerencias } from './clientes.js';
 
 export function docVacio() {
@@ -252,7 +252,8 @@ export function montarEditor(contenedor, doc, { alCambiar } = {}) {
     const t = calcularTotales(modelo.items, estado.config, { descuentoPct: modelo.descuentoPct });
     const filas = [];
     filas.push(`<div><span>Subtotal (${t.cantidadCortinas} cortina${t.cantidadCortinas === 1 ? '' : 's'})</span><strong>${plata(t.subtotal)}</strong></div>`);
-    if (t.montoDescuento) filas.push(`<div><span>Descuento ${num(t.descuentoPct, 0)}%</span><strong>&minus; ${plata(t.montoDescuento)}</strong></div>`);
+    const aj = ajuste(t);
+    if (aj) filas.push(`<div><span>${esc(aj.etiqueta)}</span><strong>${esc(aj.monto)}</strong></div>`);
     if (t.montoIva) filas.push(`<div><span>IVA ${num(t.ivaPct, 0)}%</span><strong>${plata(t.montoIva)}</strong></div>`);
     filas.push(`<div class="total"><span>Total</span><span>${plata(t.total)}</span></div>`);
     filas.push(`<div class="mini" style="margin-top:.5rem"><span>Ganancia estimada</span><span>${plata(t.ganancia)}</span></div>`);

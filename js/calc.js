@@ -88,7 +88,13 @@ function redondear(valor, multiplo) {
   return Math.round(valor / multiplo) * multiplo;
 }
 
-/** Calcula el desglose completo de una cortina. Nunca lanza: los faltantes valen 0. */
+/**
+ * Calcula el desglose completo de una cortina. Nunca lanza: los faltantes valen 0.
+ *
+ * Si el renglón trae `precioFijado` (por ejemplo, algo importado del cotizador
+ * viejo), ese precio manda: no lo recalculamos ni lo redondeamos. Así, cambiar
+ * los costos de hoy no reescribe lo que se cobró hace meses.
+ */
 export function calcularItem(item, config) {
   const anchoM = (Number(item.anchoCm) || 0) / 100;
   const altoM = (Number(item.altoCm) || 0) / 100;
@@ -112,10 +118,19 @@ export function calcularItem(item, config) {
   const conIncremento = base + montoIncremento;
 
   const instalacionUnit = item.instalacion ? Number(config.instalacion) || 0 : 0;
-  const precioUnitario = redondear(conIncremento + instalacionUnit, config.redondeo);
+
+  const fijado = item.precioFijado != null && Number.isFinite(Number(item.precioFijado));
+  const precioUnitario = fijado
+    ? Number(item.precioFijado)
+    : redondear(conIncremento + instalacionUnit, config.redondeo);
+
   const costoInstaladorUnit = item.instalacion ? Number(config.costoInstalador) || 0 : 0;
+  const costoPropio = item.costoFijado != null && Number.isFinite(Number(item.costoFijado))
+    ? Number(item.costoFijado) * cantidad
+    : (base + costoInstaladorUnit) * cantidad;
 
   return {
+    fijado,
     m2Real,
     m2,
     aplicaMinimo,
@@ -137,7 +152,7 @@ export function calcularItem(item, config) {
     total: precioUnitario * cantidad,
     costoInstalador: costoInstaladorUnit * cantidad,
     // Costo propio (sin incremento) para saber el margen real.
-    costoPropio: (base + costoInstaladorUnit) * cantidad,
+    costoPropio,
   };
 }
 

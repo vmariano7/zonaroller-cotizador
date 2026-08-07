@@ -4,7 +4,7 @@
 
 import { estado } from './store.js';
 import { calcularTotales } from './calc.js';
-import { plata, num, fecha, esc, sumarDias } from './ui.js';
+import { plata, num, fecha, esc, sumarDias, ajuste } from './ui.js';
 
 const NOMBRE_TIPO = { roller: 'Roller', vertical: 'Bandas verticales', zebra: 'Zebra' };
 
@@ -106,7 +106,7 @@ export function imprimirPresupuesto(p) {
 
     <div class="hoja__totales">
       <div><span>Subtotal</span><span>${plata(t.subtotal)}</span></div>
-      ${t.montoDescuento ? `<div><span>Descuento ${num(t.descuentoPct, 0)}%</span><span>− ${plata(t.montoDescuento)}</span></div>` : ''}
+      ${ajuste(t) ? `<div><span>${esc(ajuste(t).etiqueta)}</span><span>${esc(ajuste(t).monto)}</span></div>` : ''}
       ${t.montoIva ? `<div><span>IVA ${num(t.ivaPct, 0)}%</span><span>${plata(t.montoIva)}</span></div>` : ''}
       <div class="total"><span>Total</span><span>${plata(t.total)}</span></div>
     </div>

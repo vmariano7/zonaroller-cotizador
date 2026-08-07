@@ -63,6 +63,20 @@ function desglose(pedido) {
   return { total, porTipo, porTela, cortinas, ganancia: t.ganancia * factor };
 }
 
+/**
+ * Saca los meses vacíos del principio. Sin esto, si arrancaste hace poco, el
+ * gráfico son diez columnas en blanco y dos con datos. Dejamos un mes de
+ * contexto antes de la primera venta y nunca menos de tres columnas.
+ */
+function recortarVacios(meses, mesesConVentas) {
+  if (!mesesConVentas.length) return meses.slice(-3);
+  const primero = mesesConVentas.reduce((a, b) => (a < b ? a : b));
+  const i = meses.indexOf(primero);
+  if (i <= 0) return meses;
+  const recortado = meses.slice(Math.max(0, i - 1));
+  return recortado.length >= 3 ? recortado : meses.slice(-3);
+}
+
 export function render(contenedor) {
   let periodo = '12m';
   let metrica = 'plata';
@@ -93,7 +107,12 @@ export function render(contenedor) {
   );
 
   function pintar() {
-    const meses = mesesDelPeriodo(periodo);
+    const ventana = mesesDelPeriodo(periodo);
+    const conVentas = estado.pedidos
+      .filter((p) => p.estado !== 'cancelado')
+      .map((p) => mesDe(p.fecha))
+      .filter((m) => ventana.includes(m));
+    const meses = recortarVacios(ventana, conVentas);
     const desde = meses[0];
     const hasta = meses[meses.length - 1];
     const enRango = (iso) => {

@@ -163,6 +163,20 @@ export function chip(mapa, clave) {
   return `<span class="chip chip--${e.clase}">${esc(e.texto)}</span>`;
 }
 
+/**
+ * Cómo mostrar el ajuste sobre el subtotal. Positivo es descuento; negativo
+ * pasa cuando el precio acordado quedó por encima del calculado (redondeo
+ * hacia arriba), y ahí decir "descuento" sería mentira.
+ */
+export function ajuste(totales) {
+  if (!totales.montoDescuento) return null;
+  const esDescuento = totales.montoDescuento > 0;
+  return {
+    etiqueta: `${esDescuento ? 'Descuento' : 'Ajuste'} ${num(Math.abs(totales.descuentoPct), 1)}%`,
+    monto: `${esDescuento ? '−' : '+'} ${plata(Math.abs(totales.montoDescuento))}`,
+  };
+}
+
 export function vacio(mensaje, accionHtml = '') {
   return `<div class="vacio"><p>${esc(mensaje)}</p>${accionHtml}</div>`;
 }
