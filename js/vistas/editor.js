@@ -3,6 +3,7 @@
 import { TIPOS, SISTEMAS, itemVacio, calcularItem, calcularTotales, sistemaAuto, hayPreciosCargados } from '../calc.js';
 import { estado } from '../store.js';
 import { el, esc, plata, num, leerNumero, hoyISO } from '../ui.js';
+import { sugerencias } from './clientes.js';
 
 export function docVacio() {
   return {
@@ -34,7 +35,11 @@ export function montarEditor(contenedor, doc, { alCambiar } = {}) {
     <div class="tarjeta">
       <div class="tarjeta__cab"><span class="seccion-num">1</span><h2>Cliente</h2></div>
       <div class="campos campos--2">
-        <div><label for="c-nombre">Nombre y apellido</label><input id="c-nombre" data-cli="nombre" autocomplete="name" placeholder="Ej. María González"></div>
+        <div>
+          <label for="c-nombre">Nombre y apellido</label>
+          <input id="c-nombre" data-cli="nombre" autocomplete="off" list="zr-clientes" placeholder="Ej. María González">
+          <datalist id="zr-clientes">${sugerencias().map((s) => `<option value="${esc(s.nombre)}">`).join('')}</datalist>
+        </div>
         <div><label for="c-tel">Teléfono</label><input id="c-tel" data-cli="telefono" type="tel" inputmode="tel" autocomplete="tel" placeholder="261 555 0000"></div>
         <div><label for="c-dir">Dirección</label><input id="c-dir" data-cli="direccion" autocomplete="street-address" placeholder="Calle 123, barrio"></div>
         <div><label for="c-ciu">Ciudad / zona</label><input id="c-ciu" data-cli="ciudad" placeholder="Mendoza"></div>
@@ -76,6 +81,25 @@ export function montarEditor(contenedor, doc, { alCambiar } = {}) {
       avisar();
     });
   });
+
+  // Si elegís un cliente conocido, completamos lo que esté vacío.
+  const campoNombre = contenedor.querySelector('#c-nombre');
+  const completarCliente = () => {
+    const buscado = campoNombre.value.trim().toLowerCase();
+    if (!buscado) return;
+    const s = sugerencias().find((x) => x.nombre.trim().toLowerCase() === buscado);
+    if (!s) return;
+    [['telefono', '#c-tel'], ['direccion', '#c-dir'], ['ciudad', '#c-ciu'], ['email', '#c-mail']].forEach(([campo, sel]) => {
+      const inp = contenedor.querySelector(sel);
+      if (inp && !inp.value.trim() && s[campo]) {
+        inp.value = s[campo];
+        modelo.cliente[campo] = s[campo];
+      }
+    });
+    avisar();
+  };
+  campoNombre.addEventListener('change', completarCliente);
+  campoNombre.addEventListener('blur', completarCliente);
   contenedor.querySelectorAll('[data-doc]').forEach((inp) => {
     inp.value = modelo[inp.dataset.doc] ?? '';
     inp.addEventListener('input', () => {

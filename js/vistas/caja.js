@@ -4,7 +4,7 @@ import { estado, guardar, borrar } from '../store.js';
 import { calcularTotales } from '../calc.js';
 import { plata, fecha, esc, aviso, confirmar, modal, hoyISO, leerNumero, chip, capitalizar, ESTADOS_PEDIDO } from '../ui.js';
 import { navegar } from '../router.js';
-import { totalPedido, cobrado, saldo } from './pedidos.js';
+import { totalPedido, cobrado, saldo, costoInstalacion } from '../dinero.js';
 
 const MEDIOS = ['Transferencia', 'Efectivo', 'Débito', 'Crédito', 'Mercado Pago', 'Cheque', 'Otro'];
 const RUBROS_EGRESO = ['Telas y materiales', 'Instalación', 'Sueldos', 'Alquiler', 'Impuestos', 'Publicidad', 'Herramientas', 'Otro'];
@@ -52,12 +52,7 @@ export function render(contenedor, params = {}) {
     // Instalaciones pendientes de pago al instalador
     const instalaciones = activos
       .filter((p) => !p.instalacionPagada)
-      .map((p) => ({
-        pedido: p,
-        monto: Number.isFinite(p.costoInstalacion)
-          ? p.costoInstalacion
-          : calcularTotales(p.items, estado.config, {}).costoInstalacion,
-      }))
+      .map((p) => ({ pedido: p, monto: costoInstalacion(p) }))
       .filter((i) => i.monto > 0)
       .sort((a, b) => String(a.pedido.fechaInstalacion || '9999').localeCompare(String(b.pedido.fechaInstalacion || '9999')));
     const aPagarInstal = instalaciones.reduce((a, i) => a + i.monto, 0);
@@ -222,9 +217,7 @@ export function render(contenedor, params = {}) {
       b.addEventListener('click', async () => {
         const pedido = estado.pedidos.find((p) => p.id === b.dataset.pagarInstal);
         if (!pedido) return;
-        const monto = Number.isFinite(pedido.costoInstalacion)
-          ? pedido.costoInstalacion
-          : calcularTotales(pedido.items, estado.config, {}).costoInstalacion;
+        const monto = costoInstalacion(pedido);
         if (!(await confirmar(`¿Registrar el pago de ${plata(monto)} al instalador por el pedido ${pedido.numero}?`, { textoOk: 'Registrar' }))) return;
         await guardar('pedidos', { ...pedido, instalacionPagada: true });
         await guardar('movimientos', {

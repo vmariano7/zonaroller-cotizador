@@ -10,12 +10,17 @@ inicio como una app.
 
 | Sección | Para qué |
 |---|---|
-| **Cotizar** | Cargar cliente y cortinas, ver el total en vivo, guardar el presupuesto. |
+| **Cotizar** | Cargar cliente y cortinas, ver el total en vivo, guardar el presupuesto. Autocompleta los datos de clientes que ya compraron. |
 | **Presupuestos** | Buscar, editar, duplicar, exportar a PDF, mandar por WhatsApp, convertir en pedido. |
 | **Pedidos** | Pedidos confirmados (desde un presupuesto o desde cero), estado, fecha de instalación, pagos y orden de trabajo. |
-| **Caja** | Cuánto falta cobrar, quién debe, instalaciones a pagar, ingresos y gastos del mes. |
 | **Agenda** | Calendario con visitas a domicilio, instalaciones y tareas. Las instalaciones cargadas en un pedido aparecen solas. |
-| **Ajustes** | Precios de telas y sistemas, incrementos, reglas de cálculo, datos de la empresa, sincronización y respaldos. |
+| **Caja** | Cuánto falta cobrar, quién debe, instalaciones a pagar, ingresos y gastos del mes. |
+| **Clientes** | Historial de cada uno: qué compró, cuánto pagó, si debe, qué telas prefiere. Se arman solos con lo que cargás. |
+| **Reportes** | Ventas por mes divididas por tipo de cortina, telas más vendidas, mejores clientes, conversión de presupuestos y margen. |
+| **Ajustes** | Precios de telas y sistemas, incrementos, reglas de cálculo, datos de la empresa, PIN, sincronización y respaldos. |
+
+En el celular la barra de abajo muestra las cuatro de uso diario; el resto entra
+por **Más**. En la computadora se ven todas en el panel lateral.
 
 ## Cómo está hecho
 
@@ -27,9 +32,12 @@ index.html            estructura y arranque
 css/app.css           todos los estilos, incluida la hoja de impresión del PDF
 js/calc.js            motor de cálculo (fórmula de precios)
 js/store.js           datos: caché local + sincronización con Supabase
+js/dinero.js          totales, cobrado y saldo de un pedido
 js/router.js          navegación por hash (#/cotizar, #/pedidos, …)
 js/ui.js              formato de moneda y fechas, diálogos, avisos
+js/graficos.js        columnas apiladas y barras en SVG, sin librerías
 js/pdf.js             presupuesto y orden de trabajo para imprimir o guardar en PDF
+js/candado.js         pantalla de PIN
 js/vistas/            una pantalla por archivo
 sw.js                 service worker: la app abre aunque no haya señal
 ```

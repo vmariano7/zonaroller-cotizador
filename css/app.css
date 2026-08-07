@@ -71,22 +71,26 @@ a { color: var(--acento); }
 
 .contenido { padding: 1rem; max-width: 1200px; margin: 0 auto; }
 
-/* Navegación inferior en celular */
+/* Navegación: barra inferior en el celular, panel lateral en la compu */
 .nav {
   position: fixed; bottom: 0; left: 0; right: 0; z-index: 45;
-  display: grid; grid-template-columns: repeat(6, 1fr);
+  display: grid; grid-template-columns: repeat(5, 1fr);
   background: var(--fondo);
   border-top: 1px solid var(--linea);
   padding-bottom: env(safe-area-inset-bottom);
 }
-.nav a {
+.nav a, .nav__mas {
   display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
   height: var(--barra-alto);
   text-decoration: none; color: var(--tinta-3);
   font-size: .62rem; font-weight: 600; letter-spacing: .01em;
+  border: 0; background: none; font-family: inherit; cursor: pointer; padding: 0;
 }
-.nav a svg { width: 20px; height: 20px; stroke: currentColor; fill: none; stroke-width: 1.7; }
-.nav a.activo { color: var(--tinta); }
+.nav a svg, .nav__mas svg { width: 20px; height: 20px; stroke: currentColor; fill: none; stroke-width: 1.7; }
+.nav a.activo, .nav__mas.activo { color: var(--tinta); }
+
+/* En el celular las secundarias viven adentro de "Más" */
+.nav .nav__sec { display: none; }
 
 @media (min-width: 900px) {
   .app { display: grid; grid-template-columns: 220px 1fr; padding-bottom: 0; }
@@ -101,6 +105,8 @@ a { color: var(--acento); }
     flex-direction: row; justify-content: flex-start; gap: .6rem;
     height: 40px; padding: 0 .75rem; border-radius: 8px; font-size: .85rem;
   }
+  .nav .nav__sec { display: flex; }
+  .nav__mas { display: none; }
   .nav a.activo { background: var(--fondo-3); }
   .contenido { padding: 1.5rem 2rem 4rem; }
 }
@@ -395,6 +401,70 @@ tbody tr:hover { background: var(--fondo-2); }
 .banner--info { background: var(--azul-fondo); color: var(--azul); }
 .banner--error { background: var(--rojo-fondo); color: var(--rojo); }
 .banner .btn { margin-left: auto; flex: none; }
+
+/* ---------- Gráficos ---------- */
+
+.grafico { width: 100%; overflow: hidden; }
+.grafico svg { width: 100%; height: auto; display: block; touch-action: pan-y; }
+.grafico .zona { cursor: pointer; }
+
+.leyenda { display: flex; flex-wrap: wrap; gap: .25rem 1rem; margin-top: .6rem; }
+.leyenda__item { display: inline-flex; align-items: center; gap: .4rem; font-size: .76rem; color: var(--tinta-2); }
+.leyenda__punto { width: 10px; height: 10px; border-radius: 3px; flex: none; }
+
+.globo {
+  position: absolute; z-index: 250; display: none; pointer-events: none;
+  background: #0b0b0b; color: #fff; border-radius: 8px; padding: .5rem .6rem;
+  font-size: .76rem; line-height: 1.5; box-shadow: 0 6px 20px rgba(0,0,0,.25);
+  max-width: 240px;
+}
+.globo__titulo { font-weight: 700; margin-bottom: .25rem; }
+.globo__fila { display: flex; align-items: center; gap: .4rem; white-space: nowrap; }
+.globo__fila strong { margin-left: auto; padding-left: .75rem; font-variant-numeric: tabular-nums; }
+.globo__punto { width: 8px; height: 8px; border-radius: 2px; flex: none; }
+.globo__total {
+  display: flex; gap: .4rem; margin-top: .3rem; padding-top: .3rem;
+  border-top: 1px solid rgba(255,255,255,.25); font-weight: 700;
+}
+.globo__total strong { margin-left: auto; font-variant-numeric: tabular-nums; }
+
+/* En el celular la etiqueta y el monto comparten renglón y la barra va debajo,
+   a lo ancho: los nombres de tela no entran en una columna angosta. */
+.barras { display: grid; gap: .7rem; }
+.barra { display: grid; grid-template-columns: 1fr auto; gap: .2rem .6rem; align-items: center; }
+.barra__etq {
+  grid-column: 1; grid-row: 1;
+  font-size: .8rem; color: var(--tinta);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.barra__valor {
+  grid-column: 2; grid-row: 1;
+  font-size: .78rem; font-weight: 650; font-variant-numeric: tabular-nums;
+  white-space: nowrap; text-align: right;
+}
+.barra__pista {
+  grid-column: 1 / -1; grid-row: 2;
+  background: var(--fondo-3); border-radius: 4px; height: 14px; overflow: hidden;
+}
+.barra__relleno { height: 100%; border-radius: 0 4px 4px 0; }
+
+@media (min-width: 620px) {
+  .barras { gap: .55rem; }
+  .barra { grid-template-columns: minmax(120px, 34%) 1fr auto; }
+  .barra__etq { grid-column: 1; grid-row: 1; }
+  .barra__pista { grid-column: 2; grid-row: 1; }
+  .barra__valor { grid-column: 3; grid-row: 1; }
+}
+
+.hero { font-size: 2.4rem; font-weight: 750; letter-spacing: -.03em; line-height: 1.05; }
+@media (min-width: 760px) { .hero { font-size: 3rem; } }
+
+.segmentado { display: inline-flex; background: var(--fondo-3); border-radius: 8px; padding: 2px; gap: 2px; }
+.segmentado button {
+  border: 0; background: transparent; font: inherit; font-size: .78rem; font-weight: 600;
+  color: var(--tinta-2); padding: .3rem .65rem; border-radius: 6px; cursor: pointer; white-space: nowrap;
+}
+.segmentado button[aria-pressed="true"] { background: var(--fondo); color: var(--tinta); box-shadow: 0 1px 2px rgba(0,0,0,.08); }
 
 /* ---------- Pantalla de bloqueo ---------- */
 

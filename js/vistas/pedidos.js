@@ -8,21 +8,7 @@ import {
 import { navegar } from '../router.js';
 import { imprimirOrdenTrabajo } from '../pdf.js';
 import { montarEditor, docVacio } from './editor.js';
-
-/* ---------- Helpers de dinero ---------- */
-
-export function totalPedido(pedido) {
-  if (Number.isFinite(pedido.total)) return pedido.total;
-  return calcularTotales(pedido.items, estado.config, { descuentoPct: pedido.descuentoPct }).total;
-}
-
-export function cobrado(pedido) {
-  return (pedido.pagos || []).reduce((a, p) => a + (Number(p.monto) || 0), 0);
-}
-
-export function saldo(pedido) {
-  return totalPedido(pedido) - cobrado(pedido);
-}
+import { totalPedido, cobrado, saldo } from '../dinero.js';
 
 export async function crearPedidoDesdePresupuesto(p) {
   const t = calcularTotales(p.items, estado.config, { descuentoPct: p.descuentoPct });
