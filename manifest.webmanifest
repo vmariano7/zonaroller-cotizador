@@ -1,0 +1,16 @@
+{
+  "name": "Cotizador Zona Roller",
+  "short_name": "Zona Roller",
+  "description": "Cotizador, pedidos, caja y agenda de Zona Roller.",
+  "start_url": "./index.html#/cotizar",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#ffffff",
+  "theme_color": "#101112",
+  "lang": "es-AR",
+  "icons": [
+    { "src": "./icono.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "./icono.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

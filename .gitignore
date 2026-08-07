@@ -1,0 +1,10 @@
+# Nada de esta carpeta se publica: contiene tus costos y las instrucciones con datos propios.
+privado/
+
+# Respaldos descargados
+*.respaldo.json
+zona-roller-respaldo-*.json
+
+node_modules/
+.DS_Store
+Thumbs.db

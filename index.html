@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="robots" content="noindex, nofollow">
+  <meta name="theme-color" content="#101112">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="Zona Roller">
+  <title>Cotizador · Zona Roller</title>
+  <link rel="manifest" href="./manifest.webmanifest">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23101112'/%3E%3Ctext x='32' y='43' font-family='system-ui,sans-serif' font-size='30' font-weight='800' fill='white' text-anchor='middle'%3EZR%3C/text%3E%3C/svg%3E">
+  <link rel="apple-touch-icon" href="./icono.png">
+  <link rel="stylesheet" href="./css/app.css">
+</head>
+<body>
+  <div class="app">
+    <header class="cabecera">
+      <div class="cabecera__marca">
+        <span class="cabecera__logo">ZR</span>
+        <span>Zona Roller</span>
+      </div>
+      <button id="sync" class="cabecera__sync" title="Estado de sincronización" style="border:0;background:none;cursor:pointer;font:inherit"></button>
+    </header>
+
+    <nav class="nav" id="nav"></nav>
+
+    <main class="contenido" id="vista">
+      <div class="vacio"><p>Cargando…</p></div>
+    </main>
+  </div>
+
+  <script type="module" src="./js/app.js"></script>
+</body>
+</html>
