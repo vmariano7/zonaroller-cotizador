@@ -62,17 +62,29 @@ export function render(contenedor) {
 
         <div style="border-top:2px solid var(--linea-fuerte);margin:1rem 0 .8rem"></div>
 
+        <h3 style="margin-bottom:.5rem">Costo del instalador <span class="mini" style="font-weight:400">(lo que pagás por cortina)</span></h3>
         <div class="campo" style="display:flex;align-items:center;gap:.6rem">
-          <label style="flex:1;margin:0;font-weight:500;color:var(--acento)">Instalación por cortina <span class="mini">(lo que cobrás)</span></label>
+          <label style="flex:1;margin:0;font-weight:500;color:var(--acento)">Roller y Zebra</label>
           <div class="con-prefijo" style="width:140px"><span>$</span>
-            <input type="number" inputmode="decimal" min="0" step="1" data-num="instalacion" value="${c.instalacion ?? 0}">
+            <input type="number" inputmode="decimal" min="0" step="1" data-inst="roller" value="${c.instalador?.roller ?? 15000}">
           </div>
         </div>
         <div class="campo" style="display:flex;align-items:center;gap:.6rem">
-          <label style="flex:1;margin:0;font-weight:500">Costo del instalador <span class="mini">(lo que pagás)</span></label>
+          <label style="flex:1;margin:0;font-weight:500;color:var(--acento)">Bandas verticales y Tela tradicional</label>
           <div class="con-prefijo" style="width:140px"><span>$</span>
-            <input type="number" inputmode="decimal" min="0" step="1" data-num="costoInstalador" value="${c.costoInstalador ?? 0}">
+            <input type="number" inputmode="decimal" min="0" step="1" data-inst="vertical" value="${c.instalador?.vertical ?? 20000}">
           </div>
+        </div>
+        <div class="campo" style="display:flex;align-items:center;gap:.6rem">
+          <label style="flex:1;margin:0;font-weight:500">Recargo</label>
+          <div class="con-sufijo" style="width:140px">
+            <input type="number" inputmode="decimal" min="0" step="1" data-inst="recargoPct" value="${c.instalador?.recargoPct ?? 50}"><span>%</span>
+          </div>
+        </div>
+        <div class="banner banner--info" style="margin-top:.8rem">
+          <div>El recargo se aplica cuando el trabajo es de <strong>una sola cortina</strong>
+          o cuando la cortina mide <strong>más de 2,50 m de ancho</strong>. Al cliente la
+          instalación va sin cargo: esto es puro costo tuyo y no toca el precio.</div>
         </div>
       </div>
 
@@ -249,6 +261,13 @@ export function render(contenedor) {
   /* ---- Números sueltos ---- */
   contenedor.querySelectorAll('[data-num]').forEach((inp) =>
     inp.addEventListener('input', () => guardarPronto({ [inp.dataset.num]: leerNumero(inp.value) ?? 0 }))
+  );
+
+  /* ---- Costo del instalador ---- */
+  contenedor.querySelectorAll('[data-inst]').forEach((inp) =>
+    inp.addEventListener('input', () =>
+      guardarPronto({ instalador: { ...estado.config.instalador, [inp.dataset.inst]: leerNumero(inp.value) ?? 0 } })
+    )
   );
 
   contenedor.querySelector('[data-redondeo]').addEventListener('change', (e) =>

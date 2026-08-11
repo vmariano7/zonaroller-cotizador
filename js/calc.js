@@ -81,8 +81,9 @@ export function configVacia() {
       vertical: { activo: true, valor: 0 },
       zebra: { activo: true, valor: 0 },
     },
-    instalacion: 0, // lo que le cobrás al cliente por cortina
-    costoInstalador: 0, // lo que le pagás al instalador por cortina
+    // Lo que te sale el instalador. Al cliente la instalación va sin cargo,
+    // así que esto es puro costo y no toca el precio. Ver costoInstaladorItem.
+    instalador: { roller: 15000, vertical: 20000, recargoPct: 50 },
     // Precio de contado y el mensaje que se le manda al cliente. Ver mensaje.js.
     contado: { descuentoPct: 35, plazoDias: 5, plantilla: '' },
     minimoM2: 1,
@@ -164,6 +165,37 @@ export function descripcionItem(item) {
   return `Cortina Tela ${item.tela} ${item.color} ${ancho}x${alto}m ${item.riel} ${item.recogimiento}`;
 }
 
+/** Ancho a partir del cual el instalador cobra el recargo. */
+const ANCHO_RECARGO_M = 2.5;
+
+/** Tipos que llevan la tarifa de instalación más cara. */
+const INSTALACION_CARA = ['vertical', 'tela_tradicional'];
+
+/** Ancho de la cortina en metros, venga en metros o en centímetros. */
+export function anchoEnMetros(item) {
+  return item.tipo === 'tela_tradicional'
+    ? Number(item.anchoM) || 0
+    : (Number(item.anchoCm) || 0) / 100;
+}
+
+/**
+ * Lo que te sale el instalador por una cortina. Es un costo tuyo: al cliente
+ * la instalación va sin cargo, así que no entra en el precio.
+ *
+ * La tarifa base depende del tipo, y sube un 50% en los dos casos en que el
+ * instalador cobra más: cuando el viaje es por una sola cortina, y cuando la
+ * cortina pasa los 2,50 m de ancho (hace falta otra persona).
+ */
+export function costoInstaladorItem(item, config, { cortinasTotales = 1 } = {}) {
+  if (!item.instalacion) return 0;
+  const tarifas = config.instalador || {};
+  const base = INSTALACION_CARA.includes(item.tipo)
+    ? Number(tarifas.vertical) || 0
+    : Number(tarifas.roller) || 0;
+  const conRecargo = cortinasTotales <= 1 || anchoEnMetros(item) > ANCHO_RECARGO_M;
+  return conRecargo ? base * (1 + (Number(tarifas.recargoPct) || 0) / 100) : base;
+}
+
 /** Sistema que corresponde automáticamente a un tipo + tela. */
 export function sistemaAuto(tipo, tela, config) {
   if (tipo === 'zebra') return 'zebra';
@@ -185,8 +217,8 @@ function redondear(valor, multiplo) {
  * recalculan ni se redondean. Así, cambiar los costos de hoy no reescribe lo
  * que se cobró o costó hace meses.
  */
-export function calcularItem(item, config) {
-  if (item.tipo === 'tela_tradicional') return calcularItemTelaTradicional(item, config);
+export function calcularItem(item, config, contexto = {}) {
+  if (item.tipo === 'tela_tradicional') return calcularItemTelaTradicional(item, config, contexto);
 
   const anchoM = (Number(item.anchoCm) || 0) / 100;
   const altoM = (Number(item.altoCm) || 0) / 100;
@@ -209,16 +241,14 @@ export function calcularItem(item, config) {
   const montoIncremento = base * (incrementoPct / 100);
   const conIncremento = base + montoIncremento;
 
-  const instalacionUnit = item.instalacion ? Number(config.instalacion) || 0 : 0;
-
   const fijado = item.precioFijado != null && Number.isFinite(Number(item.precioFijado));
   const precioUnitario = fijado
     ? Number(item.precioFijado)
-    : redondear(conIncremento + instalacionUnit, config.redondeo);
+    : redondear(conIncremento, config.redondeo);
 
   const costoInstaladorUnit = item.costoInstaladorFijado != null && Number.isFinite(Number(item.costoInstaladorFijado))
     ? Number(item.costoInstaladorFijado)
-    : (item.instalacion ? Number(config.costoInstalador) || 0 : 0);
+    : costoInstaladorItem(item, config, contexto);
   const costoPropio = item.costoFijado != null && Number.isFinite(Number(item.costoFijado))
     ? (Number(item.costoFijado) + costoInstaladorUnit) * cantidad
     : (base + costoInstaladorUnit) * cantidad;
@@ -241,7 +271,6 @@ export function calcularItem(item, config) {
     incrementoPct,
     montoIncremento,
     conIncremento,
-    instalacionUnit,
     precioUnitario,
     total: precioUnitario * cantidad,
     costoInstalador: costoInstaladorUnit * cantidad,
@@ -255,7 +284,7 @@ export function calcularItem(item, config) {
  * configurables. Precio = (40.478,56 × ancho) + (900,38 × alto)
  * + (7.944,82 × ancho × alto), en metros.
  */
-function calcularItemTelaTradicional(item, config) {
+function calcularItemTelaTradicional(item, config, contexto = {}) {
   const anchoM = Number(item.anchoM) || 0;
   const altoM = Number(item.altoM) || 0;
   const cantidad = Math.max(1, Number(item.cantidad) || 1);
@@ -263,16 +292,14 @@ function calcularItemTelaTradicional(item, config) {
   const m2Real = anchoM * altoM;
   const formula = 40478.56 * anchoM + 900.38 * altoM + 7944.82 * anchoM * altoM;
 
-  const instalacionUnit = item.instalacion ? Number(config.instalacion) || 0 : 0;
-
   const fijado = item.precioFijado != null && Number.isFinite(Number(item.precioFijado));
   const precioUnitario = fijado
     ? Number(item.precioFijado)
-    : redondear(formula + instalacionUnit, config.redondeo);
+    : redondear(formula, config.redondeo);
 
   const costoInstaladorUnit = item.costoInstaladorFijado != null && Number.isFinite(Number(item.costoInstaladorFijado))
     ? Number(item.costoInstaladorFijado)
-    : (item.instalacion ? Number(config.costoInstalador) || 0 : 0);
+    : costoInstaladorItem(item, config, contexto);
   const costoPropio = item.costoFijado != null && Number.isFinite(Number(item.costoFijado))
     ? (Number(item.costoFijado) + costoInstaladorUnit) * cantidad
     : costoInstaladorUnit * cantidad;
@@ -295,7 +322,6 @@ function calcularItemTelaTradicional(item, config) {
     incrementoPct: 0,
     montoIncremento: 0,
     conIncremento: formula,
-    instalacionUnit,
     precioUnitario,
     total: precioUnitario * cantidad,
     costoInstalador: costoInstaladorUnit * cantidad,
@@ -306,7 +332,11 @@ function calcularItemTelaTradicional(item, config) {
 /** Totales de un presupuesto o pedido completo. */
 export function calcularTotales(items, config, opciones = {}) {
   const descuentoPct = Number(opciones.descuentoPct) || 0;
-  const lineas = (items || []).map((it) => ({ item: it, calc: calcularItem(it, config) }));
+  const lista = items || [];
+  // El recargo del instalador depende del trabajo entero: si el viaje es por
+  // una sola cortina cobra más, así que cada renglón necesita saber el total.
+  const cortinasTotales = lista.reduce((a, it) => a + Math.max(1, Number(it.cantidad) || 1), 0);
+  const lineas = lista.map((it) => ({ item: it, calc: calcularItem(it, config, { cortinasTotales }) }));
 
   const subtotal = lineas.reduce((a, l) => a + l.calc.total, 0);
   const montoDescuento = subtotal * (descuentoPct / 100);

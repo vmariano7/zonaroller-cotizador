@@ -2,7 +2,7 @@
 // El orden importa: primero las cortinas (que es lo que se cotiza a diario) y
 // los datos del cliente arriba, plegados, para que no tapen lo principal.
 
-import { TIPOS, SISTEMAS, ARMADO, ARMADO_POR_TIPO, itemVacio, calcularItem, calcularTotales, sistemaAuto, hayPreciosCargados, descripcionItem, detallesTecnicos } from '../calc.js';
+import { TIPOS, SISTEMAS, ARMADO, ARMADO_POR_TIPO, itemVacio, calcularItem, calcularTotales, hayPreciosCargados, descripcionItem, detallesTecnicos } from '../calc.js';
 import { estado } from '../store.js';
 import { el, esc, plata, num, leerNumero, hoyISO, ajuste, aviso } from '../ui.js';
 import { armarMensaje, datosContado, copiar } from '../mensaje.js';
@@ -349,36 +349,22 @@ export function montarEditor(contenedor, doc, { alCambiar } = {}) {
           <div class="campos campos--4 mt-16">
             ${(ARMADO_POR_TIPO[item.tipo] || []).map(selectArmado).join('')}
           </div>
-          <div class="campos campos--2 mt-16">
-            <div>
-              <label>Sistema para el costo <span class="mini">(no es el caño)</span></label>
-              <select data-campo="sistemaKey">
-                <option value="">Automático</option>
-                ${Object.entries(SISTEMAS).map(([k, v]) => `<option value="${k}"${item.sistemaKey === k ? ' selected' : ''}>${esc(v)}</option>`).join('')}
-              </select>
-            </div>
-            <div>
-              <label>Detalle</label>
-              <input data-campo="detalle" placeholder="Cualquier otra aclaración…" value="${esc(item.detalle || '')}">
-            </div>
-          </div>
     `;
 
     const opcionesAvanzadas = `
         <details class="avanzadas mt-16">
           <summary>Opciones avanzadas <span class="mini" data-armado></span></summary>
           ${especificas}
-          ${esTelaTradicional ? `
           <div class="campo mt-16">
             <label>Detalle</label>
-            <input data-campo="detalle" placeholder="Observaciones adicionales…" value="${esc(item.detalle || '')}">
-          </div>` : ''}
+            <input data-campo="detalle" placeholder="Cualquier otra aclaración…" value="${esc(item.detalle || '')}">
+          </div>
           <div class="check mt-16">
             <label class="switch">
               <input type="checkbox" data-campo="instalacion"${item.instalacion ? ' checked' : ''}>
               <span class="switch__pista"></span>
             </label>
-            <span>Incluye instalación (${plata(config.instalacion)})</span>
+            <span>La instalamos nosotros <span class="mini">(sin cargo para el cliente)</span></span>
           </div>
         </details>
     `;
@@ -446,7 +432,10 @@ export function montarEditor(contenedor, doc, { alCambiar } = {}) {
   }
 
   function pintarResumen(nodo, item) {
-    const c = calcularItem(item, estado.config);
+    // El costo del instalador depende del trabajo entero (una sola cortina
+    // sale más caro), así que el renglón necesita saber cuántas hay.
+    const cortinasTotales = modelo.items.reduce((a, it) => a + Math.max(1, Number(it.cantidad) || 1), 0);
+    const c = calcularItem(item, estado.config, { cortinasTotales });
     const partes = [];
     let sinPrecio = false;
 
@@ -454,17 +443,15 @@ export function montarEditor(contenedor, doc, { alCambiar } = {}) {
       partes.push(`${num(c.anchoM)} × ${num(c.altoM)} m`);
       if (item.riel) partes.push(esc(item.riel));
       if (item.recogimiento) partes.push(esc(item.recogimiento));
-      if (c.instalacionUnit) partes.push('instalación incluida');
       const descripcion = descripcionItem(item);
       if (descripcion) partes.unshift(`<span class="mini">${esc(descripcion)}</span>`);
     } else {
-      const auto = sistemaAuto(item.tipo, item.tela, estado.config);
       partes.push(`${num(c.m2)} m²${c.aplicaMinimo ? ' <span class="mini">(mínimo)</span>' : ''}`);
-      partes.push(`sistema ${esc(SISTEMAS[c.sistemaKey] || '—')}${item.sistemaKey && item.sistemaKey !== auto ? ' <span class="mini">(manual)</span>' : ''}`);
+      partes.push(`sistema ${esc(SISTEMAS[c.sistemaKey] || '—')}`);
       if (c.incrementoPct) partes.push(`+${num(c.incrementoPct, 0)}%`);
-      if (c.instalacionUnit) partes.push('instalación incluida');
       sinPrecio = c.precioTela === 0 || c.precioSistema === 0;
     }
+    if (item.instalacion) partes.push(`instalación ${plata(c.costoInstalador / c.cantidad)} <span class="mini">(costo tuyo)</span>`);
 
     // Con el bloque plegado igual se ve cómo va armada la cortina.
     const armado = nodo.querySelector('[data-armado]');
