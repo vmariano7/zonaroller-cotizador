@@ -83,8 +83,9 @@ export function render(contenedor) {
         </div>
         <div class="banner banner--info" style="margin-top:.8rem">
           <div>El recargo se aplica cuando el trabajo es de <strong>una sola cortina</strong>
-          o cuando la cortina mide <strong>más de 2,50 m de ancho</strong>. Al cliente la
-          instalación va sin cargo: esto es puro costo tuyo y no toca el precio.</div>
+          o cuando la cortina mide <strong>más de 2,50 m de ancho</strong>. Este costo se
+          traslada al precio final de cada cortina, así que al cliente la instalación no se
+          le cobra aparte: ya viene adentro.</div>
         </div>
       </div>
 

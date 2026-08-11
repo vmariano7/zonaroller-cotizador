@@ -364,7 +364,7 @@ export function montarEditor(contenedor, doc, { alCambiar } = {}) {
               <input type="checkbox" data-campo="instalacion"${item.instalacion ? ' checked' : ''}>
               <span class="switch__pista"></span>
             </label>
-            <span>La instalamos nosotros <span class="mini">(sin cargo para el cliente)</span></span>
+            <span>La instalamos nosotros <span class="mini">(ya viene dentro del precio)</span></span>
           </div>
         </details>
     `;
@@ -451,7 +451,7 @@ export function montarEditor(contenedor, doc, { alCambiar } = {}) {
       if (c.incrementoPct) partes.push(`+${num(c.incrementoPct, 0)}%`);
       sinPrecio = c.precioTela === 0 || c.precioSistema === 0;
     }
-    if (item.instalacion) partes.push(`instalación ${plata(c.costoInstalador / c.cantidad)} <span class="mini">(costo tuyo)</span>`);
+    if (item.instalacion) partes.push(`instalación ${plata(c.costoInstalador / c.cantidad)} <span class="mini">(incluida en el precio)</span>`);
 
     // Con el bloque plegado igual se ve cómo va armada la cortina.
     const armado = nodo.querySelector('[data-armado]');
