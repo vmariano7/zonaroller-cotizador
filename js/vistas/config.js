@@ -3,7 +3,7 @@
 
 import { estado, guardarConfig, leerConexion, guardarConexion, probarConexion, sincronizar, exportarRespaldo, importarRespaldo } from '../store.js';
 import { TIPOS, SISTEMAS } from '../calc.js';
-import { esc, aviso, confirmar, leerNumero, descargarArchivo, fecha } from '../ui.js';
+import { esc, aviso, confirmar, descargarArchivo, fecha } from '../ui.js';
 import { PLANTILLA_POR_DEFECTO, CLAVES } from '../mensaje.js';
 import { tienePin, definirPin } from '../candado.js';
 
@@ -125,11 +125,16 @@ export function render(contenedor) {
               <div class="con-sufijo"><input type="number" inputmode="decimal" min="0" step="0.1" data-num="minimoM2" value="${c.minimoM2 ?? 1}"><span>m²</span></div>
             </div>
             <div>
-              <label>Redondeo del precio final</label>
+              <label>Redondeo del precio de lista</label>
               <select data-redondeo>
                 ${[0, 100, 500, 1000].map((v) => `<option value="${v}"${Number(c.redondeo) === v ? ' selected' : ''}>${v === 0 ? 'Sin redondeo' : `Al múltiplo de ${v}`}</option>`).join('')}
               </select>
             </div>
+          </div>
+          <div class="banner banner--info" style="margin:1rem 0 0">
+            <div>Además del mínimo de m², <strong>ningún lado se cobra por debajo de 1 m</strong>:
+            una cortina de 3,00 × 0,20 m se cotiza como 3,00 × 1,00 = 3 m². La medida real se
+            guarda igual y es la que sale impresa.</div>
           </div>
           <div class="campo mt-16" style="display:flex;align-items:center;gap:.6rem">
             <label class="switch" style="margin:0">
@@ -175,6 +180,11 @@ export function render(contenedor) {
           <label>Plazo de producción</label>
           <div class="con-sufijo"><input type="number" inputmode="numeric" min="0" step="1" data-ctd="plazoDias" value="${c.contado?.plazoDias ?? 5}"><span>días</span></div>
         </div>
+      </div>
+      <div class="banner banner--info" style="margin-top:.8rem">
+        <div>Este descuento es el que arma el precio de lista: la cuenta de costos da el precio
+        <strong>de contado</strong>, y el de lista se calcula para que al descontarle este
+        porcentaje quede justo ahí. Si lo cambiás, <strong>se mueven todos los precios nuevos</strong>.</div>
       </div>
       <div class="campo mt-16">
         <label>Texto del mensaje</label>
@@ -242,12 +252,17 @@ export function render(contenedor) {
     </div>
   `;
 
+  // Todos los casilleros de acá abajo son <input type="number">, y esos siempre
+  // entregan el valor con punto decimal y sin separador de miles. leerNumero,
+  // que está pensado para texto en formato argentino, leería "1.5" como 15.
+  const leerCasillero = (inp) => Number(inp.value) || 0;
+
   /* ---- Precios de telas ---- */
   contenedor.querySelectorAll('[data-tela]').forEach((inp) =>
     inp.addEventListener('input', () => {
       const [tipo, tela] = inp.dataset.tela.split('|');
       const telas = { ...estado.config.telas };
-      telas[tipo] = { ...telas[tipo], [tela]: leerNumero(inp.value) ?? 0 };
+      telas[tipo] = { ...telas[tipo], [tela]: leerCasillero(inp) };
       guardarPronto({ telas });
     })
   );
@@ -255,19 +270,19 @@ export function render(contenedor) {
   /* ---- Sistemas ---- */
   contenedor.querySelectorAll('[data-sistema]').forEach((inp) =>
     inp.addEventListener('input', () => {
-      guardarPronto({ sistemas: { ...estado.config.sistemas, [inp.dataset.sistema]: leerNumero(inp.value) ?? 0 } });
+      guardarPronto({ sistemas: { ...estado.config.sistemas, [inp.dataset.sistema]: leerCasillero(inp) } });
     })
   );
 
   /* ---- Números sueltos ---- */
   contenedor.querySelectorAll('[data-num]').forEach((inp) =>
-    inp.addEventListener('input', () => guardarPronto({ [inp.dataset.num]: leerNumero(inp.value) ?? 0 }))
+    inp.addEventListener('input', () => guardarPronto({ [inp.dataset.num]: leerCasillero(inp) }))
   );
 
   /* ---- Costo del instalador ---- */
   contenedor.querySelectorAll('[data-inst]').forEach((inp) =>
     inp.addEventListener('input', () =>
-      guardarPronto({ instalador: { ...estado.config.instalador, [inp.dataset.inst]: leerNumero(inp.value) ?? 0 } })
+      guardarPronto({ instalador: { ...estado.config.instalador, [inp.dataset.inst]: leerCasillero(inp) } })
     )
   );
 
@@ -288,7 +303,7 @@ export function render(contenedor) {
     inp.addEventListener('input', () => {
       const tipo = inp.dataset.incValor;
       const incrementos = { ...estado.config.incrementos };
-      incrementos[tipo] = { ...incrementos[tipo], valor: leerNumero(inp.value) ?? 0 };
+      incrementos[tipo] = { ...incrementos[tipo], valor: leerCasillero(inp) };
       guardarPronto({ incrementos });
     })
   );
@@ -298,7 +313,7 @@ export function render(contenedor) {
     guardarPronto({ iva: { ...estado.config.iva, activo: e.target.checked } })
   );
   contenedor.querySelector('[data-iva-valor]').addEventListener('input', (e) =>
-    guardarPronto({ iva: { ...estado.config.iva, valor: leerNumero(e.target.value) ?? 0 } })
+    guardarPronto({ iva: { ...estado.config.iva, valor: leerCasillero(e.target) } })
   );
 
   /* ---- Empresa ---- */
@@ -309,14 +324,14 @@ export function render(contenedor) {
   );
   contenedor.querySelectorAll('[data-emp-num]').forEach((inp) =>
     inp.addEventListener('input', () =>
-      guardarPronto({ empresa: { ...estado.config.empresa, [inp.dataset.empNum]: leerNumero(inp.value) ?? 0 } })
+      guardarPronto({ empresa: { ...estado.config.empresa, [inp.dataset.empNum]: leerCasillero(inp) } })
     )
   );
 
   /* ---- Contado y mensaje ---- */
   contenedor.querySelectorAll('[data-ctd]').forEach((inp) =>
     inp.addEventListener('input', () =>
-      guardarPronto({ contado: { ...estado.config.contado, [inp.dataset.ctd]: leerNumero(inp.value) ?? 0 } })
+      guardarPronto({ contado: { ...estado.config.contado, [inp.dataset.ctd]: leerCasillero(inp) } })
     )
   );
   const textoMensaje = contenedor.querySelector('[data-ctd-texto]');

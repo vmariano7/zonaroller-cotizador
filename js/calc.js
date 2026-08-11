@@ -1,6 +1,9 @@
 // Motor de cálculo de cortinas.
 // Fórmula: ((m² × precio tela) + (ancho en metros × precio sistema)) × (1 + incremento)
-//          + lo que te sale el instalador, todo multiplicado por la cantidad.
+//          + lo que te sale el instalador. Eso da el precio de CONTADO; el de
+//          lista sale de inflarlo para que aguante el descuento (ver factorLista).
+//          Todo multiplicado por la cantidad.
+// Ningún lado se cobra por debajo del metro: ver MINIMO_LADO_M.
 
 export const TIPOS = {
   roller: {
@@ -168,6 +171,18 @@ export function descripcionItem(item) {
 /** Ancho a partir del cual el instalador cobra el recargo. */
 const ANCHO_RECARGO_M = 2.5;
 
+/**
+ * Nada por debajo del metro entra en la cuenta. No es sólo el mínimo de 1 m²:
+ * cada lado se cobra como mínimo un metro. Una cortina de 3,00 × 0,20 m son
+ * 3 m² (3 × 1), no 0,60 redondeado a 1.
+ *
+ * Ojo: es para cobrar. La medida real se sigue guardando y es la que sale
+ * impresa en el presupuesto y en la orden de trabajo.
+ */
+const MINIMO_LADO_M = 1;
+
+const ladoCobrado = (metros) => Math.max(MINIMO_LADO_M, Number(metros) || 0);
+
 /** Tipos que llevan la tarifa de instalación más cara. */
 const INSTALACION_CARA = ['vertical', 'tela_tradicional'];
 
@@ -211,6 +226,20 @@ function redondear(valor, multiplo) {
 }
 
 /**
+ * Cuánto hay que inflar la cuenta para llegar al precio de lista.
+ *
+ * Tela + sistema + incremento + instalador da lo que necesitás cobrar: ese es
+ * el precio de CONTADO. El de lista tiene que ser más alto, de manera que al
+ * hacerle el 35% de descuento aterrice justo ahí. Con 35% el factor es
+ * 1 / 0,65 = 1,538…
+ */
+export function factorLista(config) {
+  const pct = Number(config?.contado?.descuentoPct);
+  const resto = 1 - (Number.isFinite(pct) ? pct : 35) / 100;
+  return resto > 0 ? 1 / resto : 1;
+}
+
+/**
  * Calcula el desglose completo de una cortina. Nunca lanza: los faltantes valen 0.
  *
  * Si el renglón trae `precioFijado`/`costoFijado`/`costoInstaladorFijado` (por
@@ -225,8 +254,12 @@ export function calcularItem(item, config, contexto = {}) {
   const altoM = (Number(item.altoCm) || 0) / 100;
   const cantidad = Math.max(1, Number(item.cantidad) || 1);
 
+  // Lo que se cobra nunca baja del metro por lado, ni a lo ancho ni a lo alto.
+  const anchoCobrado = ladoCobrado(anchoM);
+  const altoCobrado = ladoCobrado(altoM);
+
   const m2Real = anchoM * altoM;
-  const m2 = Math.max(Number(config.minimoM2) || 0, m2Real);
+  const m2 = Math.max(Number(config.minimoM2) || 0, anchoCobrado * altoCobrado);
   const aplicaMinimo = m2 > m2Real + 1e-9;
 
   const precioTela = Number(config.telas?.[item.tipo]?.[item.tela]) || 0;
@@ -234,7 +267,7 @@ export function calcularItem(item, config, contexto = {}) {
   const precioSistema = Number(config.sistemas?.[sistemaKey]) || 0;
 
   const costoTela = m2 * precioTela;
-  const costoSistema = anchoM * precioSistema;
+  const costoSistema = anchoCobrado * precioSistema;
   const base = costoTela + costoSistema;
 
   const reglaInc = config.incrementos?.[item.tipo] || { activo: false, valor: 0 };
@@ -246,10 +279,14 @@ export function calcularItem(item, config, contexto = {}) {
     ? Number(item.costoInstaladorFijado)
     : costoInstaladorItem(item, config, contexto);
 
+  // Lo que necesitás cobrar: eso es el contado. El precio de lista lo aguanta
+  // con el descuento puesto encima.
+  const contadoUnit = conIncremento + costoInstaladorUnit;
+
   const fijado = item.precioFijado != null && Number.isFinite(Number(item.precioFijado));
   const precioUnitario = fijado
     ? Number(item.precioFijado)
-    : redondear(conIncremento + costoInstaladorUnit, config.redondeo);
+    : redondear(contadoUnit * factorLista(config), config.redondeo);
 
   const costoPropio = item.costoFijado != null && Number.isFinite(Number(item.costoFijado))
     ? (Number(item.costoFijado) + costoInstaladorUnit) * cantidad
@@ -291,8 +328,12 @@ function calcularItemTelaTradicional(item, config, contexto = {}) {
   const altoM = Number(item.altoM) || 0;
   const cantidad = Math.max(1, Number(item.cantidad) || 1);
 
+  // Mismo criterio que en los demás tipos: por debajo del metro no se cotiza.
+  const anchoCobrado = ladoCobrado(anchoM);
+  const altoCobrado = ladoCobrado(altoM);
+
   const m2Real = anchoM * altoM;
-  const formula = 40478.56 * anchoM + 900.38 * altoM + 7944.82 * anchoM * altoM;
+  const formula = 40478.56 * anchoCobrado + 900.38 * altoCobrado + 7944.82 * anchoCobrado * altoCobrado;
 
   const costoInstaladorUnit = item.costoInstaladorFijado != null && Number.isFinite(Number(item.costoInstaladorFijado))
     ? Number(item.costoInstaladorFijado)
@@ -301,7 +342,7 @@ function calcularItemTelaTradicional(item, config, contexto = {}) {
   const fijado = item.precioFijado != null && Number.isFinite(Number(item.precioFijado));
   const precioUnitario = fijado
     ? Number(item.precioFijado)
-    : redondear(formula + costoInstaladorUnit, config.redondeo);
+    : redondear((formula + costoInstaladorUnit) * factorLista(config), config.redondeo);
 
   const costoPropio = item.costoFijado != null && Number.isFinite(Number(item.costoFijado))
     ? (Number(item.costoFijado) + costoInstaladorUnit) * cantidad
@@ -310,8 +351,8 @@ function calcularItemTelaTradicional(item, config, contexto = {}) {
   return {
     fijado,
     m2Real,
-    m2: m2Real,
-    aplicaMinimo: false,
+    m2: anchoCobrado * altoCobrado,
+    aplicaMinimo: anchoCobrado * altoCobrado > m2Real + 1e-9,
     anchoM,
     altoM,
     cantidad,

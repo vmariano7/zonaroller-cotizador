@@ -276,14 +276,15 @@ export function montarEditor(contenedor, doc, { alCambiar } = {}) {
         </div>`;
 
     // Lo principal, igual para todos los tipos: tela y medidas, cuatro casilleros.
-    // Lo único que cambia es la unidad — la tela tradicional se mide en metros.
-    const enMetros = esTelaTradicional;
-    const campoAncho = enMetros
-      ? `<input data-campo="anchoM" type="number" inputmode="decimal" min="0" step="0.01" placeholder="0" value="${item.anchoM ?? ''}"><span>m</span>`
-      : `<input data-campo="anchoCm" type="number" inputmode="decimal" min="0" step="1" placeholder="0" value="${item.anchoCm ?? ''}"><span>cm</span>`;
-    const campoAlto = enMetros
-      ? `<input data-campo="altoM" type="number" inputmode="decimal" min="0" step="0.01" placeholder="0" value="${item.altoM ?? ''}"><span>m</span>`
-      : `<input data-campo="altoCm" type="number" inputmode="decimal" min="0" step="1" placeholder="0" value="${item.altoCm ?? ''}"><span>cm</span>`;
+    // Todo se tipea en metros. La tela tradicional ya se guardaba así; los demás
+    // tipos siguen guardándose en centímetros (los presupuestos viejos y la orden
+    // de trabajo hablan en cm), y `data-metros` hace la conversión al vuelo.
+    const campoMedida = (campoM, campoCm) => (esTelaTradicional
+      ? `<input data-campo="${campoM}" type="number" inputmode="decimal" min="0" step="0.01" placeholder="0" value="${item[campoM] ?? ''}">`
+      : `<input data-metros="${campoCm}" type="number" inputmode="decimal" min="0" step="0.01" placeholder="0" value="${item[campoCm] != null ? item[campoCm] / 100 : ''}">`
+    ) + '<span>m</span>';
+    const campoAncho = campoMedida('anchoM', 'anchoCm');
+    const campoAlto = campoMedida('altoM', 'altoCm');
 
     const camposMedidas = `
         <div class="campos campos--4 mt-16">
@@ -427,6 +428,18 @@ export function montarEditor(contenedor, doc, { alCambiar } = {}) {
       });
     });
 
+    // Se tipea en metros, se guarda en centímetros. El redondeo evita que
+    // 1,15 × 100 quede en 114,99999 y termine en 114 cm.
+    nodo.querySelectorAll('[data-metros]').forEach((inp) => {
+      const campo = inp.dataset.metros;
+      inp.addEventListener('input', () => {
+        item[campo] = inp.value === '' ? null : Math.round(Number(inp.value) * 100);
+        pintarResumen(nodo, item);
+        pintarTotales();
+        avisar();
+      });
+    });
+
     pintarResumen(nodo, item);
     return nodo;
   }
@@ -472,7 +485,11 @@ export function montarEditor(contenedor, doc, { alCambiar } = {}) {
     if (aj) filas.push(`<div><span>${esc(aj.etiqueta)}</span><strong>${esc(aj.monto)}</strong></div>`);
     if (t.montoIva) filas.push(`<div><span>IVA ${num(t.ivaPct, 0)}%</span><strong>${plata(t.montoIva)}</strong></div>`);
     filas.push(`<div class="total"><span>Total</span><span>${plata(t.total)}</span></div>`);
-    filas.push(`<div class="mini" style="margin-top:.5rem"><span>Ganancia estimada</span><span>${plata(t.ganancia)}</span></div>`);
+    // Dos ganancias, porque no es lo mismo cobrar en 6 cuotas que en efectivo:
+    // el precio de lista lleva el descuento adentro y esa diferencia no es tuya.
+    const d = datosContado(modelo, estado.config, t.total);
+    filas.push(`<div class="mini" style="margin-top:.5rem"><span>Ganancia con precio de lista</span><span>${plata(t.ganancia)}</span></div>`);
+    filas.push(`<div class="mini"><span>Ganancia si paga de contado</span><span>${plata(d.contado - t.costoPropio)}</span></div>`);
     cajaTotales.innerHTML = filas.join('');
     pintarMensaje(t);
     return t;
