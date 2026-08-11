@@ -28,7 +28,7 @@ export function render(contenedor) {
         <div><h2>Costos de telas</h2><div class="mini">Valor por metro cuadrado para cada tipo de cortina.</div></div>
       </div>
       <div class="grid grid--3">
-        ${Object.entries(TIPOS).map(([tipo, def]) => `
+        ${Object.entries(TIPOS).filter(([tipo]) => tipo !== 'tela_tradicional').map(([tipo, def]) => `
           <div>
             <h3 style="padding-bottom:.4rem;border-bottom:2px solid var(--linea-fuerte);margin-bottom:.6rem">${esc(def.nombre)}</h3>
             ${def.telas.map((tela) => `
@@ -39,6 +39,9 @@ export function render(contenedor) {
                 </div>
               </div>`).join('')}
           </div>`).join('')}
+      </div>
+      <div class="banner banner--info" style="margin-top:1rem">
+        <div><strong>Cortina Tela Tradicional</strong> no usa estos costos: su precio sale de una fórmula fija propia (ancho, alto y ancho×alto), configurada directamente en el código.</div>
       </div>
     </div>
 
@@ -78,7 +81,7 @@ export function render(contenedor) {
             <span class="seccion-num">03</span>
             <div><h2>Incrementos</h2><div class="mini">Activá y definí el porcentaje por artículo.</div></div>
           </div>
-          ${Object.entries(TIPOS).map(([tipo, def]) => {
+          ${Object.entries(TIPOS).filter(([tipo]) => tipo !== 'tela_tradicional').map(([tipo, def]) => {
             const inc = c.incrementos?.[tipo] || { activo: true, valor: 0 };
             return `
             <div class="campo" style="display:flex;align-items:center;gap:.6rem">

@@ -3,10 +3,10 @@
 // En la compu: destino "Guardar como PDF".
 
 import { estado } from './store.js';
-import { calcularTotales } from './calc.js';
+import { calcularTotales, descripcionItem } from './calc.js';
 import { plata, num, fecha, esc, sumarDias, ajuste } from './ui.js';
 
-const NOMBRE_TIPO = { roller: 'Roller', vertical: 'Bandas verticales', zebra: 'Zebra' };
+const NOMBRE_TIPO = { roller: 'Roller', vertical: 'Bandas verticales', zebra: 'Zebra', tela_tradicional: 'Cortina Tela Tradicional' };
 
 function montarHoja(html, tituloVentana) {
   document.querySelectorAll('.hoja').forEach((n) => n.remove());
@@ -95,7 +95,7 @@ export function imprimirPresupuesto(p) {
         ${t.lineas.map(({ item, calc }) => `
           <tr>
             <td>${esc(item.ambiente || '—')}</td>
-            <td>${esc(NOMBRE_TIPO[item.tipo] || item.tipo)} · ${esc(item.tela)}${item.detalle ? `<br><span style="font-size:8pt">${esc(item.detalle)}</span>` : ''}${calc.instalacionUnit ? '<br><span style="font-size:8pt">Incluye instalación</span>' : ''}</td>
+            <td>${esc(descripcionItem(item) || `${NOMBRE_TIPO[item.tipo] || item.tipo} · ${item.tela}`)}${item.detalle ? `<br><span style="font-size:8pt">${esc(item.detalle)}</span>` : ''}${calc.instalacionUnit ? '<br><span style="font-size:8pt">Incluye instalación</span>' : ''}</td>
             <td class="num">${num(calc.anchoM)} × ${num(calc.altoM)} m</td>
             <td class="num">${calc.cantidad}</td>
             <td class="num">${plata(calc.precioUnitario)}</td>
@@ -164,16 +164,24 @@ export function imprimirOrdenTrabajo(p) {
         </tr>
       </thead>
       <tbody>
-        ${t.lineas.map(({ item, calc }) => `
+        ${t.lineas.map(({ item, calc }) => {
+          const esTelaTradicional = item.tipo === 'tela_tradicional';
+          const ancho = esTelaTradicional ? `${num(item.anchoM)} m` : `${num(item.anchoCm, 0)} cm`;
+          const alto = esTelaTradicional ? `${num(item.altoM)} m` : `${num(item.altoCm, 0)} cm`;
+          const detalle = esTelaTradicional
+            ? [`${item.cantPaños || 1} paño${item.cantPaños === 1 ? '' : 's'}`, item.pliegue, item.detalle].filter(Boolean).join(' · ')
+            : (item.detalle || '');
+          return `
           <tr>
             <td>${esc(item.ambiente || '—')}</td>
-            <td>${esc(NOMBRE_TIPO[item.tipo] || item.tipo)}<br><span style="font-size:8pt">${esc(item.tela)}</span></td>
-            <td class="num"><strong>${num(item.anchoCm, 0)} cm</strong></td>
-            <td class="num"><strong>${num(item.altoCm, 0)} cm</strong></td>
+            <td>${esc(NOMBRE_TIPO[item.tipo] || item.tipo)}<br><span style="font-size:8pt">${esc(item.tela)}${esTelaTradicional ? ` ${esc(item.color || '')}` : ''}</span></td>
+            <td class="num"><strong>${ancho}</strong></td>
+            <td class="num"><strong>${alto}</strong></td>
             <td class="num">${calc.cantidad}</td>
-            <td style="font-size:8.5pt">${esc(calc.sistemaNombre)}</td>
-            <td style="font-size:8.5pt">${esc(item.detalle || '')}</td>
-          </tr>`).join('')}
+            <td style="font-size:8.5pt">${esc(calc.sistemaNombre)}${esTelaTradicional && item.recogimiento ? `<br>${esc(item.recogimiento)}` : ''}</td>
+            <td style="font-size:8.5pt">${esc(detalle)}</td>
+          </tr>`;
+        }).join('')}
       </tbody>
     </table>
 

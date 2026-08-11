@@ -243,6 +243,12 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; white-sp
 tbody tr:hover { background: var(--fondo-2); }
 
 .lista { display: grid; gap: .6rem; }
+.lista__mes {
+  font-size: .72rem; font-weight: 700; text-transform: uppercase; letter-spacing: .06em;
+  color: var(--tinta-3); padding: .9rem .1rem .1rem; border-top: 1px solid var(--linea);
+  margin-top: .3rem;
+}
+.lista__mes:first-child { border-top: 0; margin-top: 0; padding-top: 0; }
 .item-lista {
   background: var(--fondo); border: 1px solid var(--linea); border-radius: var(--radio);
   padding: .8rem .9rem; display: flex; gap: .75rem; align-items: flex-start;

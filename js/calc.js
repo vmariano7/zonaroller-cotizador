@@ -15,6 +15,15 @@ export const TIPOS = {
     nombre: 'Zebra',
     telas: ['Zebra Basic', 'Zebra Woody', 'Zebra Blackout'],
   },
+  tela_tradicional: {
+    nombre: 'Cortina Tela Tradicional',
+    telas: ['GASA PAÑALERA', 'BO JULLIETTE', 'BO MELODY', 'BO TEXTIL M', 'BO TRIADA', 'BO VIVA', 'GASA LANIN', 'GASA LARISA', 'GASA LICIA', 'GASA LOLA', 'GASA PORTOBELO', 'GASA TRAFUL', 'GASA TUSOR', 'LOOP', 'OTTOMAN', 'PATAGONIA TEXTIL', 'TRIADA', 'TUSSOR POLIDON', 'USHUAIA', 'VOILE DE LINO', 'VOILE LOURDES'],
+    colores: ['BLANCO OPTICO', 'CRUDO', 'GRIS CLARO', 'GRIS', 'GRIS OSCURO', 'BEIGE', 'MARFIL', 'HUMO', 'NEGRO'],
+    paños: [1, 2],
+    recogimientos: ['Derecha', 'Izquierda', 'Central', 'Motorizada Izquierda', 'Motorizada Derecha', 'Motorizada Central', 'Sin Guía'],
+    pliegues: ['Pellizco simple', 'Pellizco doble', 'Tabla encontrada', 'Tabla pisada'],
+    rieles: ['RIEL ALUM PREMIUM TT03', 'RIEL ALUM TT04', 'RIEL PVC PREMIUM TTM1', 'RIEL PVC TTM2'],
+  },
 };
 
 export const SISTEMAS = {
@@ -61,6 +70,26 @@ export function configVacia() {
 }
 
 export function itemVacio(tipo = 'roller') {
+  if (tipo === 'tela_tradicional') {
+    const t = TIPOS.tela_tradicional;
+    return {
+      id: crypto.randomUUID(),
+      ambiente: '',
+      tipo,
+      tela: t.telas[0],
+      color: t.colores[0],
+      cantPaños: 1,
+      recogimiento: t.recogimientos[0],
+      pliegue: t.pliegues[0],
+      riel: t.rieles[0],
+      rielColor: 'BLANCO',
+      anchoM: null,
+      altoM: null,
+      cantidad: 1,
+      instalacion: true,
+      detalle: '',
+    };
+  }
   return {
     id: crypto.randomUUID(),
     ambiente: '',
@@ -73,6 +102,18 @@ export function itemVacio(tipo = 'roller') {
     instalacion: true,
     detalle: '',
   };
+}
+
+/**
+ * Descripción de línea para tela tradicional: "Cortina Tela [TELA] [COLOR]
+ * [ANCHO]x[ALTO]m [RIEL] [RECOGIMIENTO]". Devuelve null para los demás tipos,
+ * que ya se describen con tipo + tela.
+ */
+export function descripcionItem(item) {
+  if (item.tipo !== 'tela_tradicional') return null;
+  const ancho = Number(item.anchoM) || 0;
+  const alto = Number(item.altoM) || 0;
+  return `Cortina Tela ${item.tela} ${item.color} ${ancho}x${alto}m ${item.riel} ${item.recogimiento}`;
 }
 
 /** Sistema que corresponde automáticamente a un tipo + tela. */
@@ -91,11 +132,14 @@ function redondear(valor, multiplo) {
 /**
  * Calcula el desglose completo de una cortina. Nunca lanza: los faltantes valen 0.
  *
- * Si el renglón trae `precioFijado` (por ejemplo, algo importado del cotizador
- * viejo), ese precio manda: no lo recalculamos ni lo redondeamos. Así, cambiar
- * los costos de hoy no reescribe lo que se cobró hace meses.
+ * Si el renglón trae `precioFijado`/`costoFijado`/`costoInstaladorFijado` (por
+ * ejemplo, algo importado del cotizador viejo), esos valores mandan: no se
+ * recalculan ni se redondean. Así, cambiar los costos de hoy no reescribe lo
+ * que se cobró o costó hace meses.
  */
 export function calcularItem(item, config) {
+  if (item.tipo === 'tela_tradicional') return calcularItemTelaTradicional(item, config);
+
   const anchoM = (Number(item.anchoCm) || 0) / 100;
   const altoM = (Number(item.altoCm) || 0) / 100;
   const cantidad = Math.max(1, Number(item.cantidad) || 1);
@@ -124,9 +168,11 @@ export function calcularItem(item, config) {
     ? Number(item.precioFijado)
     : redondear(conIncremento + instalacionUnit, config.redondeo);
 
-  const costoInstaladorUnit = item.instalacion ? Number(config.costoInstalador) || 0 : 0;
+  const costoInstaladorUnit = item.costoInstaladorFijado != null && Number.isFinite(Number(item.costoInstaladorFijado))
+    ? Number(item.costoInstaladorFijado)
+    : (item.instalacion ? Number(config.costoInstalador) || 0 : 0);
   const costoPropio = item.costoFijado != null && Number.isFinite(Number(item.costoFijado))
-    ? Number(item.costoFijado) * cantidad
+    ? (Number(item.costoFijado) + costoInstaladorUnit) * cantidad
     : (base + costoInstaladorUnit) * cantidad;
 
   return {
@@ -152,6 +198,59 @@ export function calcularItem(item, config) {
     total: precioUnitario * cantidad,
     costoInstalador: costoInstaladorUnit * cantidad,
     // Costo propio (sin incremento) para saber el margen real.
+    costoPropio,
+  };
+}
+
+/**
+ * Cortina Tela Tradicional: fórmula propia, sin tela/sistema de precios
+ * configurables. Precio = (40.478,56 × ancho) + (900,38 × alto)
+ * + (7.944,82 × ancho × alto), en metros.
+ */
+function calcularItemTelaTradicional(item, config) {
+  const anchoM = Number(item.anchoM) || 0;
+  const altoM = Number(item.altoM) || 0;
+  const cantidad = Math.max(1, Number(item.cantidad) || 1);
+
+  const m2Real = anchoM * altoM;
+  const formula = 40478.56 * anchoM + 900.38 * altoM + 7944.82 * anchoM * altoM;
+
+  const instalacionUnit = item.instalacion ? Number(config.instalacion) || 0 : 0;
+
+  const fijado = item.precioFijado != null && Number.isFinite(Number(item.precioFijado));
+  const precioUnitario = fijado
+    ? Number(item.precioFijado)
+    : redondear(formula + instalacionUnit, config.redondeo);
+
+  const costoInstaladorUnit = item.costoInstaladorFijado != null && Number.isFinite(Number(item.costoInstaladorFijado))
+    ? Number(item.costoInstaladorFijado)
+    : (item.instalacion ? Number(config.costoInstalador) || 0 : 0);
+  const costoPropio = item.costoFijado != null && Number.isFinite(Number(item.costoFijado))
+    ? (Number(item.costoFijado) + costoInstaladorUnit) * cantidad
+    : costoInstaladorUnit * cantidad;
+
+  return {
+    fijado,
+    m2Real,
+    m2: m2Real,
+    aplicaMinimo: false,
+    anchoM,
+    altoM,
+    cantidad,
+    precioTela: 0,
+    sistemaKey: null,
+    sistemaNombre: item.riel || '',
+    precioSistema: 0,
+    costoTela: 0,
+    costoSistema: 0,
+    base: formula,
+    incrementoPct: 0,
+    montoIncremento: 0,
+    conIncremento: formula,
+    instalacionUnit,
+    precioUnitario,
+    total: precioUnitario * cantidad,
+    costoInstalador: costoInstaladorUnit * cantidad,
     costoPropio,
   };
 }

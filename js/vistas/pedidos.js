@@ -1,7 +1,7 @@
 // Pedidos confirmados: listado, alta desde cero o desde presupuesto, y detalle con pagos.
 
 import { estado, guardar, borrar, obtener, proximoNumero } from '../store.js';
-import { calcularTotales } from '../calc.js';
+import { calcularTotales, descripcionItem } from '../calc.js';
 import {
   plata, num, fecha, esc, aviso, confirmar, chip, vacio, modal, hoyISO, leerNumero, ESTADOS_PEDIDO,
 } from '../ui.js';
@@ -9,6 +9,14 @@ import { navegar } from '../router.js';
 import { imprimirOrdenTrabajo } from '../pdf.js';
 import { montarEditor, docVacio } from './editor.js';
 import { totalPedido, cobrado, saldo } from '../dinero.js';
+
+function etiquetaMes(iso) {
+  const ym = String(iso || '').slice(0, 7);
+  if (!ym) return 'Sin fecha';
+  const [a, m] = ym.split('-');
+  const nombre = new Date(Number(a), Number(m) - 1, 1).toLocaleDateString('es-AR', { month: 'long' });
+  return `${nombre.toUpperCase()} ${a}`;
+}
 
 export async function crearPedidoDesdePresupuesto(p) {
   const t = calcularTotales(p.items, estado.config, { descuentoPct: p.descuentoPct });
@@ -77,10 +85,20 @@ export function render(contenedor) {
       return;
     }
 
-    lista.innerHTML = items
-      .map((p) => {
-        const s = saldo(p);
-        return `
+    // Agrupamos con un header por mes: sirve para ver de un vistazo cuántos
+    // pedidos hay por período sin tener que contar. Solo tiene sentido
+    // cuando la lista está ordenada por fecha (sin buscar) y no hay más de
+    // un mes distinto — si el usuario filtra por texto igual queda prolijo.
+    const filas = [];
+    let mesAnterior = null;
+    items.forEach((p) => {
+      const ym = String(p.fecha || '').slice(0, 7);
+      if (ym !== mesAnterior) {
+        mesAnterior = ym;
+        filas.push(`<div class="lista__mes">${esc(etiquetaMes(p.fecha))}</div>`);
+      }
+      const s = saldo(p);
+      filas.push(`
       <div class="item-lista" data-id="${p.id}">
         <div class="item-lista__cuerpo">
           <div class="item-lista__titulo">${esc(p.cliente?.nombre || 'Sin nombre')} ${chip(ESTADOS_PEDIDO, p.estado)}</div>
@@ -89,9 +107,9 @@ export function render(contenedor) {
         <div class="item-lista__monto">${plata(totalPedido(p))}
           <div class="mini" style="font-weight:600;color:${s > 0 ? 'var(--rojo)' : 'var(--verde)'}">${s > 0 ? `debe ${plata(s)}` : 'pagado'}</div>
         </div>
-      </div>`;
-      })
-      .join('');
+      </div>`);
+    });
+    lista.innerHTML = filas.join('');
 
     lista.querySelectorAll('[data-id]').forEach((n) =>
       n.addEventListener('click', () => navegar(`/pedido/${n.dataset.id}`))
@@ -238,7 +256,7 @@ export function renderDetalle(contenedor, params) {
             ${t.lineas.map(({ item, calc }) => `
               <tr>
                 <td>${esc(item.ambiente || '—')}${item.detalle ? `<div class="mini">${esc(item.detalle)}</div>` : ''}</td>
-                <td>${esc({ roller: 'Roller', vertical: 'Bandas verticales', zebra: 'Zebra' }[item.tipo] || item.tipo)}<div class="mini">${esc(item.tela)}</div></td>
+                <td>${esc({ roller: 'Roller', vertical: 'Bandas verticales', zebra: 'Zebra', tela_tradicional: 'Cortina Tela Tradicional' }[item.tipo] || item.tipo)}<div class="mini">${esc(descripcionItem(item) || item.tela)}</div></td>
                 <td class="num">${num(calc.anchoM)} × ${num(calc.altoM)} m</td>
                 <td class="num mini">${esc(calc.sistemaNombre)}</td>
                 <td class="num">${calc.cantidad}</td>

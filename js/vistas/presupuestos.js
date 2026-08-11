@@ -1,7 +1,7 @@
 // Listado y detalle de presupuestos.
 
 import { estado, guardar, borrar, obtener, proximoNumero } from '../store.js';
-import { calcularTotales } from '../calc.js';
+import { calcularTotales, descripcionItem } from '../calc.js';
 import { plata, num, fecha, esc, aviso, confirmar, chip, vacio, ajuste, ESTADOS_PRESUPUESTO, sumarDias } from '../ui.js';
 import { navegar } from '../router.js';
 import { imprimirPresupuesto } from '../pdf.js';
@@ -135,7 +135,7 @@ export function renderDetalle(contenedor, params) {
             ${t.lineas.map(({ item, calc }) => `
               <tr>
                 <td>${esc(item.ambiente || '—')}${item.detalle ? `<div class="mini">${esc(item.detalle)}</div>` : ''}</td>
-                <td>${esc({ roller: 'Roller', vertical: 'Bandas verticales', zebra: 'Zebra' }[item.tipo] || item.tipo)}<div class="mini">${esc(item.tela)}</div></td>
+                <td>${esc({ roller: 'Roller', vertical: 'Bandas verticales', zebra: 'Zebra', tela_tradicional: 'Cortina Tela Tradicional' }[item.tipo] || item.tipo)}<div class="mini">${esc(descripcionItem(item) || item.tela)}</div></td>
                 <td class="num">${num(calc.anchoM)} × ${num(calc.altoM)} m</td>
                 <td class="num">${num(calc.m2)}</td>
                 <td class="num">${calc.cantidad}</td>

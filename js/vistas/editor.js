@@ -1,6 +1,6 @@
 // Editor compartido por presupuestos y pedidos: datos del cliente + lista de cortinas.
 
-import { TIPOS, SISTEMAS, itemVacio, calcularItem, calcularTotales, sistemaAuto, hayPreciosCargados } from '../calc.js';
+import { TIPOS, SISTEMAS, itemVacio, calcularItem, calcularTotales, sistemaAuto, hayPreciosCargados, descripcionItem } from '../calc.js';
 import { estado } from '../store.js';
 import { el, esc, plata, num, leerNumero, hoyISO, ajuste } from '../ui.js';
 import { sugerencias } from './clientes.js';
@@ -132,8 +132,135 @@ export function montarEditor(contenedor, doc, { alCambiar } = {}) {
 
   function nodoItem(item, indice) {
     const config = estado.config;
+    const esTelaTradicional = item.tipo === 'tela_tradicional';
     const telas = TIPOS[item.tipo]?.telas || [];
     if (!telas.includes(item.tela)) item.tela = telas[0] || '';
+
+    if (esTelaTradicional) {
+      const t = TIPOS.tela_tradicional;
+      if (!t.colores.includes(item.color)) item.color = t.colores[0];
+      if (!t.recogimientos.includes(item.recogimiento)) item.recogimiento = t.recogimientos[0];
+      if (!t.pliegues.includes(item.pliegue)) item.pliegue = t.pliegues[0];
+      if (!t.rieles.includes(item.riel)) item.riel = t.rieles[0];
+      if (!item.rielColor) item.rielColor = 'BLANCO';
+      if (![1, 2].includes(Number(item.cantPaños))) item.cantPaños = 1;
+    }
+
+    const camposMedidas = esTelaTradicional ? `
+        <div class="campos campos--2 mt-16">
+          <div>
+            <label>Color</label>
+            <select data-campo="color">
+              ${TIPOS.tela_tradicional.colores.map((c) => `<option value="${esc(c)}"${item.color === c ? ' selected' : ''}>${esc(c)}</option>`).join('')}
+            </select>
+          </div>
+          <div>
+            <label>Cant. paños</label>
+            <select data-campo="cantPaños">
+              ${TIPOS.tela_tradicional.paños.map((n) => `<option value="${n}"${Number(item.cantPaños) === n ? ' selected' : ''}>${n}</option>`).join('')}
+            </select>
+          </div>
+        </div>
+
+        <div class="campos campos--2 mt-16">
+          <div>
+            <label>Recogimiento</label>
+            <select data-campo="recogimiento">
+              ${TIPOS.tela_tradicional.recogimientos.map((r) => `<option value="${esc(r)}"${item.recogimiento === r ? ' selected' : ''}>${esc(r)}</option>`).join('')}
+            </select>
+          </div>
+          <div>
+            <label>Tipo de pliegue</label>
+            <select data-campo="pliegue">
+              ${TIPOS.tela_tradicional.pliegues.map((p) => `<option value="${esc(p)}"${item.pliegue === p ? ' selected' : ''}>${esc(p)}</option>`).join('')}
+            </select>
+          </div>
+        </div>
+
+        <div class="campos campos--2 mt-16">
+          <div>
+            <label>Riel</label>
+            <select data-campo="riel">
+              ${TIPOS.tela_tradicional.rieles.map((r) => `<option value="${esc(r)}"${item.riel === r ? ' selected' : ''}>${esc(r)}</option>`).join('')}
+            </select>
+          </div>
+          <div>
+            <label>Riel color</label>
+            <input data-campo="rielColor" placeholder="BLANCO" value="${esc(item.rielColor || '')}">
+          </div>
+        </div>
+
+        <div class="campos campos--3 mt-16">
+          <div>
+            <label>Ancho</label>
+            <div class="con-sufijo"><input data-campo="anchoM" type="number" inputmode="decimal" min="0" step="0.01" placeholder="0" value="${item.anchoM ?? ''}"><span>m</span></div>
+          </div>
+          <div>
+            <label>Alto</label>
+            <div class="con-sufijo"><input data-campo="altoM" type="number" inputmode="decimal" min="0" step="0.01" placeholder="0" value="${item.altoM ?? ''}"><span>m</span></div>
+          </div>
+          <div>
+            <label>Cantidad</label>
+            <input data-campo="cantidad" type="number" inputmode="numeric" min="1" step="1" value="${item.cantidad || 1}">
+          </div>
+        </div>
+    ` : `
+        <div class="campos campos--3 mt-16">
+          <div>
+            <label>Ancho</label>
+            <div class="con-sufijo"><input data-campo="anchoCm" type="number" inputmode="decimal" min="0" step="1" placeholder="0" value="${item.anchoCm ?? ''}"><span>cm</span></div>
+          </div>
+          <div>
+            <label>Alto</label>
+            <div class="con-sufijo"><input data-campo="altoCm" type="number" inputmode="decimal" min="0" step="1" placeholder="0" value="${item.altoCm ?? ''}"><span>cm</span></div>
+          </div>
+          <div>
+            <label>Cantidad</label>
+            <input data-campo="cantidad" type="number" inputmode="numeric" min="1" step="1" value="${item.cantidad || 1}">
+          </div>
+        </div>
+    `;
+
+    const opcionesAvanzadas = esTelaTradicional ? `
+        <details class="mt-16">
+          <summary class="mini" style="cursor:pointer">Opciones avanzadas</summary>
+          <div class="campo mt-16">
+            <label>Detalle</label>
+            <input data-campo="detalle" placeholder="Observaciones adicionales…" value="${esc(item.detalle || '')}">
+          </div>
+          <div class="check mt-16">
+            <label class="switch">
+              <input type="checkbox" data-campo="instalacion"${item.instalacion ? ' checked' : ''}>
+              <span class="switch__pista"></span>
+            </label>
+            <span>Incluye instalación (${plata(config.instalacion)})</span>
+          </div>
+        </details>
+    ` : `
+        <details class="mt-16">
+          <summary class="mini" style="cursor:pointer">Opciones avanzadas</summary>
+          <div class="campos campos--2 mt-16">
+            <div>
+              <label>Sistema</label>
+              <select data-campo="sistemaKey">
+                <option value="">Automático</option>
+                ${Object.entries(SISTEMAS).map(([k, v]) => `<option value="${k}"${item.sistemaKey === k ? ' selected' : ''}>${esc(v)}</option>`).join('')}
+              </select>
+            </div>
+            <div>
+              <label>Detalle</label>
+              <input data-campo="detalle" placeholder="Lado de cadena, comando, color…" value="${esc(item.detalle || '')}">
+            </div>
+          </div>
+          <div class="check mt-16">
+            <label class="switch">
+              <input type="checkbox" data-campo="instalacion"${item.instalacion ? ' checked' : ''}>
+              <span class="switch__pista"></span>
+            </label>
+            <span>Incluye instalación (${plata(config.instalacion)})</span>
+          </div>
+        </details>
+    `;
 
     const nodo = el(`
       <div class="cortina" data-id="${item.id}">
@@ -158,44 +285,8 @@ export function montarEditor(contenedor, doc, { alCambiar } = {}) {
           </div>
         </div>
 
-        <div class="campos campos--3 mt-16">
-          <div>
-            <label>Ancho</label>
-            <div class="con-sufijo"><input data-campo="anchoCm" type="number" inputmode="decimal" min="0" step="1" placeholder="0" value="${item.anchoCm ?? ''}"><span>cm</span></div>
-          </div>
-          <div>
-            <label>Alto</label>
-            <div class="con-sufijo"><input data-campo="altoCm" type="number" inputmode="decimal" min="0" step="1" placeholder="0" value="${item.altoCm ?? ''}"><span>cm</span></div>
-          </div>
-          <div>
-            <label>Cantidad</label>
-            <input data-campo="cantidad" type="number" inputmode="numeric" min="1" step="1" value="${item.cantidad || 1}">
-          </div>
-        </div>
-
-        <details class="mt-16">
-          <summary class="mini" style="cursor:pointer">Opciones avanzadas</summary>
-          <div class="campos campos--2 mt-16">
-            <div>
-              <label>Sistema</label>
-              <select data-campo="sistemaKey">
-                <option value="">Automático</option>
-                ${Object.entries(SISTEMAS).map(([k, v]) => `<option value="${k}"${item.sistemaKey === k ? ' selected' : ''}>${esc(v)}</option>`).join('')}
-              </select>
-            </div>
-            <div>
-              <label>Detalle</label>
-              <input data-campo="detalle" placeholder="Lado de cadena, comando, color…" value="${esc(item.detalle || '')}">
-            </div>
-          </div>
-          <div class="check mt-16">
-            <label class="switch">
-              <input type="checkbox" data-campo="instalacion"${item.instalacion ? ' checked' : ''}>
-              <span class="switch__pista"></span>
-            </label>
-            <span>Incluye instalación (${plata(config.instalacion)})</span>
-          </div>
-        </details>
+        ${camposMedidas}
+        ${opcionesAvanzadas}
 
         <div class="cortina__resumen" data-resumen></div>
       </div>
@@ -212,7 +303,11 @@ export function montarEditor(contenedor, doc, { alCambiar } = {}) {
       const evento = inp.tagName === 'SELECT' || inp.type === 'checkbox' ? 'change' : 'input';
       inp.addEventListener(evento, () => {
         if (inp.type === 'checkbox') item[campo] = inp.checked;
-        else if (inp.type === 'number') item[campo] = leerNumero(inp.value);
+        // Los <input type="number"> del navegador siempre usan punto decimal,
+        // nunca separador de miles: leerNumero (pensado para texto con formato
+        // argentino) los rompería, ej. "1.2" → 12.
+        else if (inp.type === 'number') item[campo] = inp.value === '' ? null : Number(inp.value);
+        else if (campo === 'cantPaños') item[campo] = leerNumero(inp.value) || 1;
         else item[campo] = inp.value;
 
         if (campo === 'tipo') {
@@ -233,14 +328,25 @@ export function montarEditor(contenedor, doc, { alCambiar } = {}) {
 
   function pintarResumen(nodo, item) {
     const c = calcularItem(item, estado.config);
-    const auto = sistemaAuto(item.tipo, item.tela, estado.config);
     const partes = [];
-    partes.push(`${num(c.m2)} m²${c.aplicaMinimo ? ' <span class="mini">(mínimo)</span>' : ''}`);
-    partes.push(`sistema ${esc(SISTEMAS[c.sistemaKey] || '—')}${item.sistemaKey && item.sistemaKey !== auto ? ' <span class="mini">(manual)</span>' : ''}`);
-    if (c.incrementoPct) partes.push(`+${num(c.incrementoPct, 0)}%`);
-    if (c.instalacionUnit) partes.push('instalación incluida');
+    let sinPrecio = false;
 
-    const sinPrecio = c.precioTela === 0 || c.precioSistema === 0;
+    if (item.tipo === 'tela_tradicional') {
+      partes.push(`${num(c.anchoM)} × ${num(c.altoM)} m`);
+      if (item.riel) partes.push(esc(item.riel));
+      if (item.recogimiento) partes.push(esc(item.recogimiento));
+      if (c.instalacionUnit) partes.push('instalación incluida');
+      const descripcion = descripcionItem(item);
+      if (descripcion) partes.unshift(`<span class="mini">${esc(descripcion)}</span>`);
+    } else {
+      const auto = sistemaAuto(item.tipo, item.tela, estado.config);
+      partes.push(`${num(c.m2)} m²${c.aplicaMinimo ? ' <span class="mini">(mínimo)</span>' : ''}`);
+      partes.push(`sistema ${esc(SISTEMAS[c.sistemaKey] || '—')}${item.sistemaKey && item.sistemaKey !== auto ? ' <span class="mini">(manual)</span>' : ''}`);
+      if (c.incrementoPct) partes.push(`+${num(c.incrementoPct, 0)}%`);
+      if (c.instalacionUnit) partes.push('instalación incluida');
+      sinPrecio = c.precioTela === 0 || c.precioSistema === 0;
+    }
+
     nodo.querySelector('[data-resumen]').innerHTML = `
       <span>${partes.join(' · ')}</span>
       <span class="cortina__precio">${plata(c.total)}${c.cantidad > 1 ? ` <span class="mini">(${c.cantidad} × ${plata(c.precioUnitario)})</span>` : ''}</span>

@@ -8,8 +8,8 @@ import { columnasApiladas, barrasHorizontales, tablaDeSeries, SERIES } from '../
 import { totalPedido, cobrado } from '../dinero.js';
 import { claveCliente } from './clientes.js';
 
-const NOMBRE_TIPO = { roller: 'Roller', vertical: 'Bandas verticales', zebra: 'Zebra' };
-const ORDEN_TIPOS = ['roller', 'vertical', 'zebra'];
+const NOMBRE_TIPO = { roller: 'Roller', vertical: 'Bandas verticales', zebra: 'Zebra', tela_tradicional: 'Tela Tradicional' };
+const ORDEN_TIPOS = ['roller', 'vertical', 'zebra', 'tela_tradicional'];
 
 const mesDe = (iso) => String(iso || '').slice(0, 7);
 
@@ -48,7 +48,7 @@ function desglose(pedido) {
   const base = t.subtotal || 1;
   const factor = total / base;
 
-  const porTipo = { roller: 0, vertical: 0, zebra: 0 };
+  const porTipo = { roller: 0, vertical: 0, zebra: 0, tela_tradicional: 0 };
   const porTela = {};
   let cortinas = 0;
 
@@ -60,7 +60,11 @@ function desglose(pedido) {
     cortinas += calc.cantidad;
   });
 
-  return { total, porTipo, porTela, cortinas, ganancia: t.ganancia * factor };
+  // Ojo: la ganancia NO se multiplica por factor. t.ganancia ya sale de
+  // `neto` (subtotal con el descuento aplicado) menos el costo, así que ya
+  // está en la escala correcta — volver a multiplicarla por factor
+  // (≈ 1 - descuentoPct/100) aplicaría el descuento dos veces y la subestima.
+  return { total, porTipo, porTela, cortinas, ganancia: t.ganancia };
 }
 
 /**
