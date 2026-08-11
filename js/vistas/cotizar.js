@@ -49,7 +49,7 @@ export function render(contenedor, params = {}) {
     const d = editor.leer();
     if (!d.cliente.nombre?.trim()) {
       aviso('Poné al menos el nombre del cliente.', 'error');
-      contenedor.querySelector('#c-nombre')?.focus();
+      editor.enfocarCliente();
       return;
     }
     const t = editor.totales();

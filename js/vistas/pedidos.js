@@ -1,14 +1,53 @@
 // Pedidos confirmados: listado, alta desde cero o desde presupuesto, y detalle con pagos.
 
 import { estado, guardar, borrar, obtener, proximoNumero } from '../store.js';
-import { calcularTotales, descripcionItem } from '../calc.js';
+import { calcularTotales, descripcionItem, detallesTecnicos } from '../calc.js';
 import {
   plata, num, fecha, esc, aviso, confirmar, chip, vacio, modal, hoyISO, leerNumero, ESTADOS_PEDIDO,
 } from '../ui.js';
 import { navegar } from '../router.js';
 import { imprimirOrdenTrabajo } from '../pdf.js';
 import { montarEditor, docVacio } from './editor.js';
-import { totalPedido, cobrado, saldo } from '../dinero.js';
+import { totalPedido, cobrado, saldo, costos, margen } from '../dinero.js';
+
+/** Cómo va armada la cortina, en una línea. Vacío si no hay nada que decir. */
+const armado = (item) => [...detallesTecnicos(item), item.detalle].filter(Boolean).join(' · ');
+
+/** Un día como ISO, sin que el huso horario lo corra al día anterior. */
+function iso(d) {
+  const c = new Date(d);
+  c.setMinutes(c.getMinutes() - c.getTimezoneOffset());
+  return c.toISOString().slice(0, 10);
+}
+
+/** Atajos de período para el resumen de venta. */
+const RANGOS = [
+  {
+    clave: 'mes',
+    texto: 'Este mes',
+    fechas: () => {
+      const h = new Date(`${hoyISO()}T12:00:00`);
+      return [iso(new Date(h.getFullYear(), h.getMonth(), 1)), hoyISO()];
+    },
+  },
+  {
+    clave: '3m',
+    texto: '3 meses',
+    fechas: () => {
+      const h = new Date(`${hoyISO()}T12:00:00`);
+      return [iso(new Date(h.getFullYear(), h.getMonth() - 2, 1)), hoyISO()];
+    },
+  },
+  {
+    clave: 'anio',
+    texto: 'Este año',
+    fechas: () => {
+      const h = new Date(`${hoyISO()}T12:00:00`);
+      return [iso(new Date(h.getFullYear(), 0, 1)), hoyISO()];
+    },
+  },
+  { clave: 'todo', texto: 'Todo', fechas: () => ['', ''] },
+];
 
 function etiquetaMes(iso) {
   const ym = String(iso || '').slice(0, 7);
@@ -52,6 +91,22 @@ export function render(contenedor) {
         <a class="btn btn--primario" href="#/pedido-nuevo">+ Pedido desde cero</a>
       </div>
     </div>
+    <div class="tarjeta mb-16">
+      <div class="tarjeta__cab">
+        <h2>Resumen de venta</h2>
+        <div class="der">
+          <div class="segmentado" data-rango>
+            ${RANGOS.map((r) => `<button data-v="${r.clave}"${r.clave === 'mes' ? ' aria-pressed="true"' : ''}>${r.texto}</button>`).join('')}
+          </div>
+        </div>
+      </div>
+      <div class="campos campos--2">
+        <div><label for="rs-desde">Desde</label><input id="rs-desde" type="date" data-desde></div>
+        <div><label for="rs-hasta">Hasta</label><input id="rs-hasta" type="date" data-hasta></div>
+      </div>
+      <div class="mt-16" data-resumen></div>
+    </div>
+
     <div class="campos campos--2 mb-16">
       <input data-buscar placeholder="Buscar por cliente, número o dirección…">
       <select data-filtro>
@@ -65,6 +120,85 @@ export function render(contenedor) {
   const lista = contenedor.querySelector('[data-lista]');
   const inputBuscar = contenedor.querySelector('[data-buscar]');
   const selFiltro = contenedor.querySelector('[data-filtro]');
+  const inputDesde = contenedor.querySelector('[data-desde]');
+  const inputHasta = contenedor.querySelector('[data-hasta]');
+  const cajaResumen = contenedor.querySelector('[data-resumen]');
+
+  /* ---- Resumen de venta del período ---- */
+
+  function pintarResumen() {
+    const desde = inputDesde.value;
+    const hasta = inputHasta.value;
+    // Los cancelados no son venta.
+    const enRango = estado.pedidos.filter((p) => {
+      if (p.estado === 'cancelado') return false;
+      const f = String(p.fecha || '');
+      return (!desde || f >= desde) && (!hasta || f <= hasta);
+    });
+
+    const vendido = enRango.reduce((a, p) => a + totalPedido(p), 0);
+    const costo = enRango.reduce((a, p) => a + costos(p).total, 0);
+    const ganancia = vendido - costo;
+    const pct = vendido ? (ganancia / vendido) * 100 : 0;
+    const cortinas = enRango.reduce((a, p) => a + (Number(p.cantidadCortinas) || 0), 0);
+    const pagado = enRango.reduce((a, p) => a + cobrado(p), 0);
+    const pendiente = enRango.reduce((a, p) => a + Math.max(0, saldo(p)), 0);
+
+    if (!enRango.length) {
+      cajaResumen.innerHTML = '<div class="mini">No hay pedidos en este período.</div>';
+      return;
+    }
+
+    cajaResumen.innerHTML = `
+      <div class="kpis">
+        <div class="kpi">
+          <div class="kpi__etiqueta">Vendido</div>
+          <div class="kpi__valor">${plata(vendido)}</div>
+          <div class="kpi__pie">${enRango.length} pedido${enRango.length === 1 ? '' : 's'} · ${num(cortinas, 0)} cortinas</div>
+        </div>
+        <div class="kpi">
+          <div class="kpi__etiqueta">Costo abonado</div>
+          <div class="kpi__valor">${plata(costo)}</div>
+          <div class="kpi__pie">materiales e instalador</div>
+        </div>
+        <div class="kpi ${ganancia >= 0 ? 'kpi--verde' : 'kpi--rojo'}">
+          <div class="kpi__etiqueta">Ganancia</div>
+          <div class="kpi__valor">${plata(ganancia)}</div>
+          <div class="kpi__pie">${num(pct, 0)}% del vendido</div>
+        </div>
+        <div class="kpi ${pendiente > 0 ? 'kpi--rojo' : 'kpi--verde'}">
+          <div class="kpi__etiqueta">Por cobrar</div>
+          <div class="kpi__valor">${plata(pendiente)}</div>
+          <div class="kpi__pie">cobrado ${plata(pagado)}</div>
+        </div>
+      </div>`;
+  }
+
+  function aplicarRango(clave) {
+    const r = RANGOS.find((x) => x.clave === clave);
+    if (!r) return;
+    const [desde, hasta] = r.fechas();
+    inputDesde.value = desde;
+    inputHasta.value = hasta;
+    pintarResumen();
+  }
+
+  contenedor.querySelectorAll('[data-rango] button').forEach((b) =>
+    b.addEventListener('click', () => {
+      contenedor.querySelectorAll('[data-rango] button').forEach((o) => o.setAttribute('aria-pressed', String(o === b)));
+      aplicarRango(b.dataset.v);
+    })
+  );
+
+  // Tocar las fechas a mano deselecciona los atajos: ya no es "este mes".
+  [inputDesde, inputHasta].forEach((inp) =>
+    inp.addEventListener('change', () => {
+      contenedor.querySelectorAll('[data-rango] button').forEach((o) => o.setAttribute('aria-pressed', 'false'));
+      pintarResumen();
+    })
+  );
+
+  aplicarRango('mes');
 
   function pintar() {
     const q = inputBuscar.value.trim().toLowerCase();
@@ -156,7 +290,7 @@ export function renderEditor(contenedor, params = {}) {
     const d = editor.leer();
     if (!d.cliente.nombre?.trim()) {
       aviso('Poné al menos el nombre del cliente.', 'error');
-      contenedor.querySelector('#c-nombre')?.focus();
+      editor.enfocarCliente();
       return;
     }
     const t = editor.totales();
@@ -192,6 +326,9 @@ export function renderDetalle(contenedor, params) {
   const t = calcularTotales(p.items, estado.config, { descuentoPct: p.descuentoPct });
   const pagado = cobrado(p);
   const debe = t.total - pagado;
+  const cs = costos(p);
+  const gana = margen(p);
+  const ganaPct = t.total ? (gana / t.total) * 100 : 0;
 
   contenedor.innerHTML = `
     <div class="titulo-pagina">
@@ -233,7 +370,7 @@ export function renderDetalle(contenedor, params) {
         </div>
         <div class="fila-botones mt-16">
           ${p.cliente?.telefono ? `<a class="btn btn--chico" href="tel:${esc(p.cliente.telefono)}">Llamar</a>` : ''}
-          ${p.presupuestoId ? `<a class="btn btn--chico" href="#/presupuesto/${p.presupuestoId}">Ver presupuesto</a>` : ''}
+          ${p.presupuestoId && obtener('presupuestos', p.presupuestoId) ? `<a class="btn btn--chico" href="#/presupuesto/${p.presupuestoId}">Ver presupuesto</a>` : ''}
           <button class="btn btn--peligro btn--chico" data-eliminar>Eliminar pedido</button>
         </div>
       </div>
@@ -248,6 +385,36 @@ export function renderDetalle(contenedor, params) {
     </div>
 
     <div class="tarjeta">
+      <div class="tarjeta__cab">
+        <h2>Qué te salió este pedido</h2>
+        <div class="der mini">${cs.esManual ? 'costo puesto a mano' : 'costo deducido de tus precios'}</div>
+      </div>
+      <div class="campos campos--2">
+        <div>
+          <label for="p-costo">Costo de materiales</label>
+          <div class="con-prefijo"><span>$</span>
+            <input id="p-costo" type="number" inputmode="decimal" min="0" step="1" data-costo
+                   value="${cs.esManual ? Math.round(cs.materiales) : ''}" placeholder="${Math.round(cs.calculado)}">
+          </div>
+          <div class="mini" style="margin-top:.4rem">
+            Con tus costos cargados da ${plata(cs.calculado)}. Si lo compraste con descuento,
+            escribí acá lo que pagaste de verdad.
+          </div>
+          ${cs.esManual ? '<div class="fila-botones mt-16"><button class="btn btn--chico btn--fantasma" data-costo-auto>Volver al calculado</button></div>' : ''}
+        </div>
+        <div class="totales" style="align-self:end">
+          <div><span>Materiales</span><strong>${plata(cs.materiales)}</strong></div>
+          <div><span>Instalador</span><strong>${plata(cs.instalacion)}</strong></div>
+          <div class="total"><span>Costo total</span><span>${plata(cs.total)}</span></div>
+          <div style="margin-top:.4rem">
+            <span>Margen</span>
+            <strong style="color:${gana >= 0 ? 'var(--verde)' : 'var(--rojo)'}">${plata(gana)} <span class="mini">(${num(ganaPct, 0)}%)</span></strong>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="tarjeta">
       <div class="tarjeta__cab"><h2>Cortinas</h2></div>
       <div class="tabla-scroll">
         <table>
@@ -255,7 +422,7 @@ export function renderDetalle(contenedor, params) {
           <tbody>
             ${t.lineas.map(({ item, calc }) => `
               <tr>
-                <td>${esc(item.ambiente || '—')}${item.detalle ? `<div class="mini">${esc(item.detalle)}</div>` : ''}</td>
+                <td>${esc(item.ambiente || '—')}${armado(item) ? `<div class="mini">${esc(armado(item))}</div>` : ''}</td>
                 <td>${esc({ roller: 'Roller', vertical: 'Bandas verticales', zebra: 'Zebra', tela_tradicional: 'Cortina Tela Tradicional' }[item.tipo] || item.tipo)}<div class="mini">${esc(descripcionItem(item) || item.tela)}</div></td>
                 <td class="num">${num(calc.anchoM)} × ${num(calc.altoM)} m</td>
                 <td class="num mini">${esc(calc.sistemaNombre)}</td>
@@ -313,6 +480,25 @@ export function renderDetalle(contenedor, params) {
 
   contenedor.querySelector('[data-instalpag]').addEventListener('change', async (e) => {
     await guardar('pedidos', { ...p, instalacionPagada: e.target.checked });
+    renderDetalle(contenedor, params);
+  });
+
+  // El costo se guarda al salir del campo. Vacío = volver al calculado.
+  contenedor.querySelector('[data-costo]').addEventListener('change', async (e) => {
+    const crudo = e.target.value.trim();
+    const valor = crudo === '' ? null : Number(crudo);
+    if (valor !== null && (!Number.isFinite(valor) || valor < 0)) {
+      aviso('Poné un costo válido.', 'error');
+      return;
+    }
+    await guardar('pedidos', { ...p, costoMateriales: valor });
+    aviso(valor === null ? 'Vuelve a usar el costo calculado.' : `Costo actualizado a ${plata(valor)}.`);
+    renderDetalle(contenedor, params);
+  });
+
+  contenedor.querySelector('[data-costo-auto]')?.addEventListener('click', async () => {
+    await guardar('pedidos', { ...p, costoMateriales: null });
+    aviso('Vuelve a usar el costo calculado.');
     renderDetalle(contenedor, params);
   });
 

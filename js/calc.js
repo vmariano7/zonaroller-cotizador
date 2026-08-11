@@ -34,6 +34,35 @@ export const SISTEMAS = {
   zebra: 'Sistema Zebra',
 };
 
+/**
+ * Cómo se arma cada cortina. No entra en el precio: son las decisiones que
+ * necesita el taller y que viajan a la orden de trabajo.
+ * Ojo con `sistemaCano`: es el diámetro del caño, otra cosa que el `sistemaKey`
+ * de arriba, que es el que define el costo.
+ */
+export const ARMADO = {
+  comando: { etiqueta: 'Lado del comando', prefijo: 'Comando', valores: ['Izquierda', 'Derecha', 'I/D'] },
+  cadena: { etiqueta: 'Tipo de cadena', prefijo: 'Cadena', valores: ['Metálica', 'PVC'] },
+  caida: { etiqueta: 'Tipo de caída', prefijo: 'Caída', valores: ['Adelante', 'Atrás'] },
+  sistemaCano: { etiqueta: 'Sistema (caño)', prefijo: 'Sistema', valores: ['32', '38', '45'] },
+  recogimientoVertical: {
+    etiqueta: 'Tipo de recogimiento', prefijo: 'Recogimiento',
+    valores: ['Derecho', 'Izquierdo', 'Central', 'Bilateral'],
+  },
+};
+
+/**
+ * Qué se elige en cada tipo. Las bandas verticales no llevan cadena, caída ni
+ * caño: se recogen hacia un lado, así que van comando y recogimiento.
+ * La tela tradicional tiene los suyos propios (paños, pliegue, riel…).
+ */
+export const ARMADO_POR_TIPO = {
+  roller: ['comando', 'cadena', 'caida', 'sistemaCano'],
+  zebra: ['comando', 'cadena', 'caida', 'sistemaCano'],
+  vertical: ['comando', 'recogimientoVertical'],
+  tela_tradicional: [],
+};
+
 // Config vacía: los precios reales NO viven en el código, se cargan desde
 // Supabase o desde un respaldo importado. Ver README.
 export function configVacia() {
@@ -54,6 +83,8 @@ export function configVacia() {
     },
     instalacion: 0, // lo que le cobrás al cliente por cortina
     costoInstalador: 0, // lo que le pagás al instalador por cortina
+    // Precio de contado y el mensaje que se le manda al cliente. Ver mensaje.js.
+    contado: { descuentoPct: 35, plazoDias: 5, plantilla: '' },
     minimoM2: 1,
     redondeo: 100, // redondea el precio unitario final al múltiplo indicado (0 = sin redondeo)
     iva: { activo: false, valor: 21 },
@@ -100,8 +131,25 @@ export function itemVacio(tipo = 'roller') {
     cantidad: 1,
     sistemaKey: null, // null = automático según tipo y tela
     instalacion: true,
+    // Armado: arranca vacío, se elige cortina por cortina. Al agregar otra
+    // cortina el editor copia lo que hayas puesto en la anterior.
+    ...Object.fromEntries((ARMADO_POR_TIPO[tipo] || []).map((k) => [k, ''])),
     detalle: '',
   };
+}
+
+/**
+ * Cómo se arma esta cortina, en texto: lo que necesita el taller.
+ * Sirve tanto para el resumen en pantalla como para la orden de trabajo.
+ */
+export function detallesTecnicos(item) {
+  if (item.tipo === 'tela_tradicional') {
+    const paños = Number(item.cantPaños) || 1;
+    return [`${paños} paño${paños === 1 ? '' : 's'}`, item.pliegue, item.recogimiento].filter(Boolean);
+  }
+  return (ARMADO_POR_TIPO[item.tipo] || [])
+    .map((campo) => (item[campo] ? `${ARMADO[campo].prefijo} ${item[campo]}` : null))
+    .filter(Boolean);
 }
 
 /**

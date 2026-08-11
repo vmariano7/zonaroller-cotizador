@@ -5,6 +5,7 @@ import { calcularTotales, descripcionItem } from '../calc.js';
 import { plata, num, fecha, esc, aviso, confirmar, chip, vacio, ajuste, ESTADOS_PRESUPUESTO, sumarDias } from '../ui.js';
 import { navegar } from '../router.js';
 import { imprimirPresupuesto } from '../pdf.js';
+import { armarMensaje, datosContado, copiar } from '../mensaje.js';
 import { crearPedidoDesdePresupuesto } from './pedidos.js';
 
 export function render(contenedor) {
@@ -80,6 +81,8 @@ export function renderDetalle(contenedor, params) {
   const t = calcularTotales(p.items, estado.config, { descuentoPct: p.descuentoPct });
   const validez = sumarDias(p.fecha, p.validezDias ?? estado.config.empresa?.validezDias ?? 15);
   const pedidoLigado = estado.pedidos.find((o) => o.presupuestoId === p.id);
+  const ctd = datosContado(p, estado.config, t.total);
+  const mensajeCliente = armarMensaje(p, estado.config, t.total);
 
   contenedor.innerHTML = `
     <div class="titulo-pagina">
@@ -127,6 +130,31 @@ export function renderDetalle(contenedor, params) {
     </div>
 
     <div class="tarjeta">
+      <div class="tarjeta__cab">
+        <h2>Mensaje para el cliente</h2>
+        <div class="der mini">contado: ${num(ctd.pct, 1)}% · producción ${num(ctd.plazo, 0)} días</div>
+      </div>
+      <div class="precios">
+        <div class="precio">
+          <div class="precio__etiqueta">Precio de lista</div>
+          <div class="precio__valor">${plata(ctd.lista)}</div>
+          <div class="mini">3 y 6 cuotas sin interés</div>
+        </div>
+        <div class="precio precio--contado">
+          <div class="precio__etiqueta">Precio de contado</div>
+          <div class="precio__valor">${plata(ctd.contado)}</div>
+          <div class="mini">${ctd.manual != null ? 'puesto a mano' : `${num(ctd.pct, 1)}% de descuento`}</div>
+        </div>
+      </div>
+      <div class="campo mt-16">
+        <textarea data-msj rows="9" readonly style="min-height:190px">${esc(mensajeCliente)}</textarea>
+      </div>
+      <div class="fila-botones">
+        <button class="btn btn--primario" data-copiar-msj>Copiar mensaje</button>
+      </div>
+    </div>
+
+    <div class="tarjeta">
       <div class="tarjeta__cab"><h2>Detalle</h2></div>
       <div class="tabla-scroll">
         <table>
@@ -162,6 +190,18 @@ export function renderDetalle(contenedor, params) {
   });
 
   contenedor.querySelector('[data-pdf]').addEventListener('click', () => imprimirPresupuesto(p));
+
+  contenedor.querySelector('[data-copiar-msj]').addEventListener('click', async (e) => {
+    // Ojo: currentTarget queda en null apenas termina el despacho del evento,
+    // así que hay que guardarlo antes del primer await.
+    const btn = e.currentTarget;
+    if (!(await copiar(contenedor.querySelector('[data-msj]').value))) {
+      aviso('No pude copiar. Seleccioná el texto y copialo a mano.', 'error');
+      return;
+    }
+    btn.textContent = '✓ Copiado';
+    setTimeout(() => { btn.textContent = 'Copiar mensaje'; }, 1600);
+  });
 
   contenedor.querySelector('[data-convertir]')?.addEventListener('click', async () => {
     if (!(await confirmar('¿Convertir este presupuesto en un pedido confirmado?', { textoOk: 'Convertir' }))) return;

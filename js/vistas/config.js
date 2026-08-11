@@ -4,6 +4,7 @@
 import { estado, guardarConfig, leerConexion, guardarConexion, probarConexion, sincronizar, exportarRespaldo, importarRespaldo } from '../store.js';
 import { TIPOS, SISTEMAS } from '../calc.js';
 import { esc, aviso, confirmar, leerNumero, descargarArchivo, fecha } from '../ui.js';
+import { PLANTILLA_POR_DEFECTO, CLAVES } from '../mensaje.js';
 import { tienePin, definirPin } from '../candado.js';
 
 let temporizador;
@@ -150,6 +151,31 @@ export function render(contenedor) {
     <div class="tarjeta">
       <div class="tarjeta__cab">
         <span class="seccion-num">06</span>
+        <div><h2>Precio de contado y mensaje</h2><div class="mini">Lo que sale por defecto en cada cotización. En cada presupuesto lo podés cambiar.</div></div>
+      </div>
+      <div class="campos campos--2">
+        <div>
+          <label>Descuento de contado</label>
+          <div class="con-sufijo"><input type="number" inputmode="decimal" min="0" max="100" step="1" data-ctd="descuentoPct" value="${c.contado?.descuentoPct ?? 35}"><span>%</span></div>
+        </div>
+        <div>
+          <label>Plazo de producción</label>
+          <div class="con-sufijo"><input type="number" inputmode="numeric" min="0" step="1" data-ctd="plazoDias" value="${c.contado?.plazoDias ?? 5}"><span>días</span></div>
+        </div>
+      </div>
+      <div class="campo mt-16">
+        <label>Texto del mensaje</label>
+        <textarea data-ctd-texto rows="10" style="min-height:200px">${esc(c.contado?.plantilla || PLANTILLA_POR_DEFECTO)}</textarea>
+        <div class="mini mt-16">Lo que va entre llaves se reemplaza solo: ${CLAVES.map(([k, q]) => `<code>${esc(k)}</code> ${esc(q)}`).join(' · ')}</div>
+      </div>
+      <div class="fila-botones">
+        <button class="btn btn--fantasma btn--chico" data-ctd-restaurar>Volver al texto original</button>
+      </div>
+    </div>
+
+    <div class="tarjeta">
+      <div class="tarjeta__cab">
+        <span class="seccion-num">07</span>
         <div><h2>Sincronización</h2><div class="mini">Para ver los mismos datos en la compu y en el celular.</div></div>
       </div>
       <div class="banner banner--${estado.sync.estado === 'error' ? 'error' : estado.sync.activa ? 'info' : 'aviso'}">
@@ -172,7 +198,7 @@ export function render(contenedor) {
 
     <div class="tarjeta">
       <div class="tarjeta__cab">
-        <span class="seccion-num">07</span>
+        <span class="seccion-num">08</span>
         <div><h2>PIN de acceso</h2><div class="mini">${tienePin() ? 'Activado: la app lo pide cada vez que se abre.' : 'Desactivado: la app abre directo.'}</div></div>
       </div>
       <div class="campos campos--2">
@@ -192,7 +218,7 @@ export function render(contenedor) {
 
     <div class="tarjeta">
       <div class="tarjeta__cab">
-        <span class="seccion-num">08</span>
+        <span class="seccion-num">09</span>
         <div><h2>Respaldo</h2><div class="mini">Bajá una copia de todo o restaurá desde un archivo.</div></div>
       </div>
       <div class="fila-botones">
@@ -266,6 +292,23 @@ export function render(contenedor) {
       guardarPronto({ empresa: { ...estado.config.empresa, [inp.dataset.empNum]: leerNumero(inp.value) ?? 0 } })
     )
   );
+
+  /* ---- Contado y mensaje ---- */
+  contenedor.querySelectorAll('[data-ctd]').forEach((inp) =>
+    inp.addEventListener('input', () =>
+      guardarPronto({ contado: { ...estado.config.contado, [inp.dataset.ctd]: leerNumero(inp.value) ?? 0 } })
+    )
+  );
+  const textoMensaje = contenedor.querySelector('[data-ctd-texto]');
+  textoMensaje.addEventListener('input', () =>
+    guardarPronto({ contado: { ...estado.config.contado, plantilla: textoMensaje.value } })
+  );
+  contenedor.querySelector('[data-ctd-restaurar]').addEventListener('click', async () => {
+    if (!(await confirmar('¿Volver al texto original? Perdés los cambios que le hayas hecho.', { textoOk: 'Volver al original' }))) return;
+    textoMensaje.value = PLANTILLA_POR_DEFECTO;
+    guardarPronto({ contado: { ...estado.config.contado, plantilla: '' } });
+    aviso('Texto restaurado.');
+  });
 
   /* ---- Sincronización ---- */
   contenedor.querySelector('[data-sb-guardar]').addEventListener('click', async (e) => {

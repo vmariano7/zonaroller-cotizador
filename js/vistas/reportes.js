@@ -5,7 +5,7 @@ import { calcularTotales, TIPOS } from '../calc.js';
 import { plata, num, esc, hoyISO, capitalizar } from '../ui.js';
 import { navegar } from '../router.js';
 import { columnasApiladas, barrasHorizontales, tablaDeSeries, SERIES } from '../graficos.js';
-import { totalPedido, cobrado } from '../dinero.js';
+import { totalPedido, cobrado, costos } from '../dinero.js';
 import { claveCliente } from './clientes.js';
 
 const NOMBRE_TIPO = { roller: 'Roller', vertical: 'Bandas verticales', zebra: 'Zebra', tela_tradicional: 'Tela Tradicional' };
@@ -64,7 +64,8 @@ function desglose(pedido) {
   // `neto` (subtotal con el descuento aplicado) menos el costo, así que ya
   // está en la escala correcta — volver a multiplicarla por factor
   // (≈ 1 - descuentoPct/100) aplicaría el descuento dos veces y la subestima.
-  return { total, porTipo, porTela, cortinas, ganancia: t.ganancia };
+  // Si el pedido tiene el costo puesto a mano, corregimos por la diferencia.
+  return { total, porTipo, porTela, cortinas, ganancia: t.ganancia - costos(pedido).desvio };
 }
 
 /**
@@ -134,8 +135,6 @@ export function render(contenedor) {
     const margenPct = vendido ? (ganancia / vendido) * 100 : 0;
 
     const presupuestos = estado.presupuestos.filter((p) => enRango(p.fecha));
-    const confirmados = presupuestos.filter((p) => p.estado === 'confirmado').length;
-    const conversion = presupuestos.length ? (confirmados / presupuestos.length) * 100 : 0;
 
     // Serie mensual apilada por tipo
     const series = ORDEN_TIPOS.map((tipo) => ({
@@ -198,9 +197,9 @@ export function render(contenedor) {
           <div class="kpi__pie">${num(margenPct, 0)}% del facturado</div>
         </div>
         <div class="kpi">
-          <div class="kpi__etiqueta">Conversión</div>
-          <div class="kpi__valor">${num(conversion, 0)}%</div>
-          <div class="kpi__pie">${confirmados} de ${presupuestos.length} presupuestos</div>
+          <div class="kpi__etiqueta">Costo abonado</div>
+          <div class="kpi__valor">${plata(vendido - ganancia)}</div>
+          <div class="kpi__pie">materiales e instalador</div>
         </div>
         <div class="kpi">
           <div class="kpi__etiqueta">Por cobrar</div>
@@ -279,7 +278,12 @@ export function render(contenedor) {
         detalle: `${lista.length} presupuesto${lista.length === 1 ? '' : 's'}`,
       };
     });
-    barrasHorizontales(cuerpo.querySelector('[data-gr-estados]'), { items: estados, color: SERIES[2] });
+    const cajaEstados = cuerpo.querySelector('[data-gr-estados]');
+    if (!presupuestos.length) {
+      cajaEstados.innerHTML = '<div class="mini">Todavía no hay presupuestos en este período.</div>';
+    } else {
+      barrasHorizontales(cajaEstados, { items: estados, color: SERIES[2] });
+    }
 
     cuerpo.querySelectorAll('[data-metrica] button').forEach((b) =>
       b.addEventListener('click', () => {

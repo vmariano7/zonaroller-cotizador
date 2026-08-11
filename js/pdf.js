@@ -3,7 +3,7 @@
 // En la compu: destino "Guardar como PDF".
 
 import { estado } from './store.js';
-import { calcularTotales, descripcionItem } from './calc.js';
+import { calcularTotales, descripcionItem, detallesTecnicos } from './calc.js';
 import { plata, num, fecha, esc, sumarDias, ajuste } from './ui.js';
 
 const NOMBRE_TIPO = { roller: 'Roller', vertical: 'Bandas verticales', zebra: 'Zebra', tela_tradicional: 'Cortina Tela Tradicional' };
@@ -168,9 +168,8 @@ export function imprimirOrdenTrabajo(p) {
           const esTelaTradicional = item.tipo === 'tela_tradicional';
           const ancho = esTelaTradicional ? `${num(item.anchoM)} m` : `${num(item.anchoCm, 0)} cm`;
           const alto = esTelaTradicional ? `${num(item.altoM)} m` : `${num(item.altoCm, 0)} cm`;
-          const detalle = esTelaTradicional
-            ? [`${item.cantPaños || 1} paño${item.cantPaños === 1 ? '' : 's'}`, item.pliegue, item.detalle].filter(Boolean).join(' · ')
-            : (item.detalle || '');
+          // El taller necesita todo el armado: comando, cadena, caída, caño.
+          const detalle = [...detallesTecnicos(item), item.detalle].filter(Boolean).join(' · ');
           return `
           <tr>
             <td>${esc(item.ambiente || '—')}</td>
@@ -178,7 +177,7 @@ export function imprimirOrdenTrabajo(p) {
             <td class="num"><strong>${ancho}</strong></td>
             <td class="num"><strong>${alto}</strong></td>
             <td class="num">${calc.cantidad}</td>
-            <td style="font-size:8.5pt">${esc(calc.sistemaNombre)}${esTelaTradicional && item.recogimiento ? `<br>${esc(item.recogimiento)}` : ''}</td>
+            <td style="font-size:8.5pt">${esc(calc.sistemaNombre)}</td>
             <td style="font-size:8.5pt">${esc(detalle)}</td>
           </tr>`;
         }).join('')}
