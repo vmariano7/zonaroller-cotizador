@@ -4,7 +4,7 @@
 
 import { TIPOS, SISTEMAS, ARMADO, ARMADO_POR_TIPO, itemVacio, calcularItem, calcularTotales, hayPreciosCargados, descripcionItem, detallesTecnicos } from '../calc.js';
 import { estado } from '../store.js';
-import { el, esc, plata, num, leerNumero, hoyISO, ajuste, aviso } from '../ui.js';
+import { el, esc, plata, num, leerNumero, hoyISO, aviso } from '../ui.js';
 import { armarMensaje, datosContado, copiar } from '../mensaje.js';
 import { sugerencias } from './clientes.js';
 
@@ -94,20 +94,8 @@ export function montarEditor(contenedor, doc, { alCambiar } = {}) {
     </div>
 
     <div class="tarjeta">
-      <div class="tarjeta__cab"><span class="seccion-num">2</span><h2>Cierre</h2></div>
-      <div class="campos campos--2">
-        <div>
-          <label for="c-desc">Descuento general</label>
-          <div class="con-sufijo"><input id="c-desc" type="number" min="0" max="100" step="1" data-doc="descuentoPct" placeholder="0"><span>%</span></div>
-        </div>
-      </div>
-      <div class="campo mt-16"><label for="c-obs">Observaciones para el cliente <span class="mini">(salen en el PDF)</span></label><textarea id="c-obs" data-doc="notas" placeholder="Ej. Plazo de entrega 15 días hábiles."></textarea></div>
-      <div class="totales mt-16" data-totales></div>
-    </div>
-
-    <div class="tarjeta">
       <div class="tarjeta__cab">
-        <span class="seccion-num">3</span>
+        <span class="seccion-num">2</span>
         <div><h2>Mensaje para el cliente</h2><div class="mini">Se arma solo con los precios de acá abajo.</div></div>
       </div>
       <div class="precios">
@@ -148,7 +136,6 @@ export function montarEditor(contenedor, doc, { alCambiar } = {}) {
   `;
 
   const cajaItems = contenedor.querySelector('[data-items]');
-  const cajaTotales = contenedor.querySelector('[data-totales]');
   const panelCliente = contenedor.querySelector('[data-cliente]');
   const botonCliente = contenedor.querySelector('[data-abrir-cliente]');
   const cuerpoCliente = panelCliente.querySelector('.plegable__cuerpo');
@@ -220,7 +207,6 @@ export function montarEditor(contenedor, doc, { alCambiar } = {}) {
     inp.addEventListener('input', () => {
       if (inp.type === 'number') modelo[clave] = inp.value === '' ? null : Number(inp.value);
       else modelo[clave] = inp.value;
-      if (clave === 'descuentoPct') pintarTotales();
       pintarMensaje();
       avisar();
     });
@@ -479,18 +465,6 @@ export function montarEditor(contenedor, doc, { alCambiar } = {}) {
 
   function pintarTotales() {
     const t = calcularTotales(modelo.items, estado.config, { descuentoPct: modelo.descuentoPct });
-    const filas = [];
-    filas.push(`<div><span>Subtotal (${t.cantidadCortinas} cortina${t.cantidadCortinas === 1 ? '' : 's'})</span><strong>${plata(t.subtotal)}</strong></div>`);
-    const aj = ajuste(t);
-    if (aj) filas.push(`<div><span>${esc(aj.etiqueta)}</span><strong>${esc(aj.monto)}</strong></div>`);
-    if (t.montoIva) filas.push(`<div><span>IVA ${num(t.ivaPct, 0)}%</span><strong>${plata(t.montoIva)}</strong></div>`);
-    filas.push(`<div class="total"><span>Total</span><span>${plata(t.total)}</span></div>`);
-    // Dos ganancias, porque no es lo mismo cobrar en 6 cuotas que en efectivo:
-    // el precio de lista lleva el descuento adentro y esa diferencia no es tuya.
-    const d = datosContado(modelo, estado.config, t.total);
-    filas.push(`<div class="mini" style="margin-top:.5rem"><span>Ganancia con precio de lista</span><span>${plata(t.ganancia)}</span></div>`);
-    filas.push(`<div class="mini"><span>Ganancia si paga de contado</span><span>${plata(d.contado - t.costoPropio)}</span></div>`);
-    cajaTotales.innerHTML = filas.join('');
     pintarMensaje(t);
     return t;
   }

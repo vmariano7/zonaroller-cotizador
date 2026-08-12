@@ -5,7 +5,7 @@ import { calcularTotales, TIPOS } from '../calc.js';
 import { plata, num, esc, hoyISO, capitalizar } from '../ui.js';
 import { navegar } from '../router.js';
 import { columnasApiladas, barrasHorizontales, tablaDeSeries, SERIES } from '../graficos.js';
-import { totalPedido, cobrado, costos } from '../dinero.js';
+import { totalPedido, cobrado, costos, margen } from '../dinero.js';
 import { claveCliente } from './clientes.js';
 
 const NOMBRE_TIPO = { roller: 'Roller', vertical: 'Bandas verticales', zebra: 'Zebra', tela_tradicional: 'Tela Tradicional' };
@@ -60,12 +60,11 @@ function desglose(pedido) {
     cortinas += calc.cantidad;
   });
 
-  // Ojo: la ganancia NO se multiplica por factor. t.ganancia ya sale de
-  // `neto` (subtotal con el descuento aplicado) menos el costo, así que ya
-  // está en la escala correcta — volver a multiplicarla por factor
-  // (≈ 1 - descuentoPct/100) aplicaría el descuento dos veces y la subestima.
-  // Si el pedido tiene el costo puesto a mano, corregimos por la diferencia.
-  return { total, porTipo, porTela, cortinas, ganancia: t.ganancia - costos(pedido).desvio };
+  // La ganancia sale del total realmente cobrado menos el costo real, que es
+  // lo mismo que muestra la ficha del pedido. No se recalcula desde los
+  // renglones: un pedido cobrado de contado vale menos que su precio de lista,
+  // y esa diferencia no es ganancia.
+  return { total, porTipo, porTela, cortinas, ganancia: margen(pedido) };
 }
 
 /**

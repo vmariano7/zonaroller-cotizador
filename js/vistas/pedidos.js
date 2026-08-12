@@ -8,7 +8,7 @@ import {
 import { navegar } from '../router.js';
 import { imprimirOrdenTrabajo } from '../pdf.js';
 import { montarEditor, docVacio } from './editor.js';
-import { totalPedido, cobrado, saldo, costos, margen } from '../dinero.js';
+import { totalPedido, cobrado, saldo, costos, margen, venta } from '../dinero.js';
 
 /** Cómo va armada la cortina, en una línea. Vacío si no hay nada que decir. */
 const armado = (item) => [...detallesTecnicos(item), item.detalle].filter(Boolean).join(' · ');
@@ -68,7 +68,14 @@ export async function crearPedidoDesdePresupuesto(p) {
     descuentoPct: p.descuentoPct || 0,
     notas: p.notas || '',
     estado: 'pendiente',
+    // Arranca al precio de lista. En la ficha del pedido se elige si en
+    // realidad se cobró de contado. Ver venta() en dinero.js.
+    totalLista: t.total,
+    modoVenta: 'lista',
+    totalAcordado: null,
     total: t.total,
+    contadoPct: p.contadoPct ?? null,
+    contadoManual: p.contadoManual ?? null,
     cantidadCortinas: t.cantidadCortinas,
     costoInstalacion: t.costoInstalacion,
     fechaInstalacion: '',
@@ -294,19 +301,22 @@ export function renderEditor(contenedor, params = {}) {
       return;
     }
     const t = editor.totales();
-    const registro = {
+    const base = {
       ...(existente || {}),
       ...d,
       numero: existente?.numero || proximoNumero('pedidos', 'OT'),
       estado: existente?.estado || 'pendiente',
-      total: t.total,
+      // Cambiar las cortinas mueve el precio de lista; cómo se cobró (lista o
+      // contado, con o sin redondeo) se respeta y se recalcula sobre la base nueva.
+      totalLista: t.total,
+      modoVenta: existente?.modoVenta || 'lista',
       cantidadCortinas: t.cantidadCortinas,
       costoInstalacion: t.costoInstalacion,
       pagos: existente?.pagos || [],
       fechaInstalacion: existente?.fechaInstalacion || '',
       instalacionPagada: existente?.instalacionPagada || false,
     };
-    const g = await guardar('pedidos', registro);
+    const g = await guardar('pedidos', { ...base, total: venta(base).total });
     aviso(`Pedido ${g.numero} guardado.`);
     navegar(`/pedido/${g.id}`);
   }
@@ -324,11 +334,13 @@ export function renderDetalle(contenedor, params) {
   }
 
   const t = calcularTotales(p.items, estado.config, { descuentoPct: p.descuentoPct });
+  const v = venta(p);
+  const cobra = totalPedido(p);
   const pagado = cobrado(p);
-  const debe = t.total - pagado;
+  const debe = cobra - pagado;
   const cs = costos(p);
   const gana = margen(p);
-  const ganaPct = t.total ? (gana / t.total) * 100 : 0;
+  const ganaPct = cobra ? (gana / cobra) * 100 : 0;
 
   contenedor.innerHTML = `
     <div class="titulo-pagina">
@@ -343,10 +355,42 @@ export function renderDetalle(contenedor, params) {
     </div>
 
     <div class="kpis mb-16">
-      <div class="kpi"><div class="kpi__etiqueta">Total</div><div class="kpi__valor">${plata(t.total)}</div></div>
+      <div class="kpi"><div class="kpi__etiqueta">Total</div><div class="kpi__valor">${plata(cobra)}</div><div class="kpi__pie">${v.modo === 'contado' ? 'precio de contado' : 'precio de lista'}${v.redondeo ? ' · redondeado' : ''}</div></div>
       <div class="kpi kpi--verde"><div class="kpi__etiqueta">Cobrado</div><div class="kpi__valor">${plata(pagado)}</div></div>
       <div class="kpi ${debe > 0 ? 'kpi--rojo' : 'kpi--verde'}"><div class="kpi__etiqueta">Saldo</div><div class="kpi__valor">${plata(debe)}</div></div>
       <div class="kpi"><div class="kpi__etiqueta">Instalación a pagar</div><div class="kpi__valor">${plata(p.instalacionPagada ? 0 : t.costoInstalacion)}</div><div class="kpi__pie">${p.instalacionPagada ? 'ya pagada' : `${t.cantidadCortinas} cortinas`}</div></div>
+    </div>
+
+    <div class="tarjeta">
+      <div class="tarjeta__cab">
+        <h2>Cómo se vendió</h2>
+        <div class="der">
+          <div class="segmentado" data-modo>
+            <button data-v="lista"${v.modo === 'lista' ? ' aria-pressed="true"' : ''}>Precio de lista</button>
+            <button data-v="contado"${v.modo === 'contado' ? ' aria-pressed="true"' : ''}>Precio de contado</button>
+          </div>
+        </div>
+      </div>
+      <div class="campos campos--2">
+        <div>
+          <label for="p-acordado">Precio final acordado</label>
+          <div class="con-prefijo"><span>$</span>
+            <input id="p-acordado" type="number" inputmode="decimal" min="0" step="1" data-acordado
+                   value="${v.acordado != null ? Math.round(v.acordado) : ''}" placeholder="${Math.round(v.segunModo)}">
+          </div>
+          <div class="mini" style="margin-top:.4rem">
+            Vacío cobra el precio ${v.modo === 'contado' ? 'de contado' : 'de lista'}.
+            Si lo redondeaste con el cliente, escribí acá lo que cerraron.
+          </div>
+          ${v.acordado != null ? `<div class="fila-botones mt-16"><button class="btn btn--chico btn--fantasma" data-acordado-auto>Volver a ${plata(v.segunModo)}</button></div>` : ''}
+        </div>
+        <div class="totales" style="align-self:end">
+          <div><span>Precio de lista</span><strong>${plata(v.lista)}</strong></div>
+          <div><span>Precio de contado <span class="mini">(−${num(v.pct, 1)}%)</span></span><strong>${plata(v.contado)}</strong></div>
+          ${v.redondeo ? `<div><span>Redondeo</span><strong>${v.redondeo > 0 ? '+' : '−'}${plata(Math.abs(v.redondeo))}</strong></div>` : ''}
+          <div class="total"><span>Se cobra</span><span>${plata(v.total)}</span></div>
+        </div>
+      </div>
     </div>
 
     <div class="grid grid--2">
@@ -432,6 +476,7 @@ export function renderDetalle(contenedor, params) {
           </tbody>
         </table>
       </div>
+      ${Math.abs(v.total - v.lista) > 0.5 ? `<div class="mt-16 mini">Los precios de esta tabla son los de lista. Este pedido se cobró <strong>${plata(v.total)}</strong> — ver <em>Cómo se vendió</em>.</div>` : ''}
       ${p.notas ? `<div class="mt-16 mini"><strong>Observaciones:</strong> ${esc(p.notas)}</div>` : ''}
       ${p.cliente?.notas ? `<div class="mini"><strong>Notas internas:</strong> ${esc(p.cliente.notas)}</div>` : ''}
     </div>
@@ -466,6 +511,42 @@ export function renderDetalle(contenedor, params) {
       })
     );
   }
+
+  /* ---- Cómo se vendió ---- */
+
+  // El total guardado siempre tiene que coincidir con lo que dice esta tarjeta:
+  // es el número que usan el listado, Caja y Reportes.
+  async function guardarVenta(cambios, texto) {
+    const base = { ...p, ...cambios };
+    await guardar('pedidos', { ...base, total: venta(base).total });
+    aviso(texto);
+    renderDetalle(contenedor, params);
+  }
+
+  contenedor.querySelectorAll('[data-modo] button').forEach((b) =>
+    b.addEventListener('click', () => {
+      if (b.dataset.v === v.modo) return;
+      const otro = venta({ ...p, modoVenta: b.dataset.v });
+      guardarVenta({ modoVenta: b.dataset.v }, `Se cobra el precio de ${b.dataset.v}: ${plata(otro.total)}.`);
+    })
+  );
+
+  contenedor.querySelector('[data-acordado]').addEventListener('change', async (e) => {
+    const crudo = e.target.value.trim();
+    const valor = crudo === '' ? null : Number(crudo);
+    if (valor !== null && (!Number.isFinite(valor) || valor < 0)) {
+      aviso('Poné un precio válido.', 'error');
+      return;
+    }
+    guardarVenta(
+      { totalAcordado: valor },
+      valor === null ? `Vuelve al precio de ${v.modo}.` : `Precio acordado en ${plata(valor)}.`
+    );
+  });
+
+  contenedor.querySelector('[data-acordado-auto]')?.addEventListener('click', () =>
+    guardarVenta({ totalAcordado: null }, `Vuelve al precio de ${v.modo}.`)
+  );
 
   contenedor.querySelector('[data-estado]').addEventListener('change', async (e) => {
     await guardar('pedidos', { ...p, estado: e.target.value });
