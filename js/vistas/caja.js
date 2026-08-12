@@ -39,7 +39,7 @@ export function render(contenedor, params = {}) {
 
   contenedor.innerHTML = `
     <div class="titulo-pagina">
-      <div><h1>Caja</h1><div class="sub">Cobranzas, pagos pendientes y resultado del mes</div></div>
+      <div><h1>Caja</h1><div class="sub">Lo que tenés, lo que te deben y lo que tenés que pagar</div></div>
       <div class="der"><button class="btn btn--primario" data-mov>+ Movimiento</button></div>
     </div>
     <div data-cuerpo></div>
@@ -75,10 +75,7 @@ export function render(contenedor, params = {}) {
 
     const movsMes = estado.movimientos.filter((m) => mesDe(m.fecha) === mes);
     const ingresosExtra = movsMes.filter((m) => m.tipo === 'ingreso').reduce((a, m) => a + (Number(m.monto) || 0), 0);
-    const egresosMes = movsMes.filter((m) => m.tipo === 'egreso').reduce((a, m) => a + (Number(m.monto) || 0), 0);
-
     const ingresosMes = cobradoMes + ingresosExtra;
-    const resultado = ingresosMes - egresosMes;
 
     // Presupuestos abiertos (todavía no confirmados)
     const enJuego = estado.presupuestos
@@ -92,6 +89,9 @@ export function render(contenedor, params = {}) {
     ])].filter(Boolean).sort().reverse();
 
     const sc = saldosCaja();
+    // Con lo que hay hoy, más lo que los clientes deben, menos lo que hay que
+    // pagarle al instalador por lo que todavía no se instaló.
+    const capital = sc.total + porCobrar - aPagarInstal;
 
     cuerpo.innerHTML = `
       <div class="tarjeta mb-16">
@@ -106,17 +106,14 @@ export function render(contenedor, params = {}) {
           <div class="kpi kpi--verde">
             <div class="kpi__etiqueta">${esc(CAJAS.efectivo.nombre)}</div>
             <div class="kpi__valor">${plata(sc.efectivo)}</div>
-            <div class="kpi__pie">${plata(sc.base.efectivo)} de partida ${sc.movio.efectivo >= 0 ? '+' : '−'} ${plata(Math.abs(sc.movio.efectivo))}</div>
           </div>
           <div class="kpi kpi--verde">
             <div class="kpi__etiqueta">${esc(CAJAS.cuenta.nombre)}</div>
             <div class="kpi__valor">${plata(sc.cuenta)}</div>
-            <div class="kpi__pie">${plata(sc.base.cuenta)} de partida ${sc.movio.cuenta >= 0 ? '+' : '−'} ${plata(Math.abs(sc.movio.cuenta))}</div>
           </div>
           <div class="kpi">
             <div class="kpi__etiqueta">Total disponible</div>
             <div class="kpi__valor">${plata(sc.total)}</div>
-            <div class="kpi__pie">local y banco juntos</div>
           </div>
         </div>
         <div class="banner banner--info mt-16">
@@ -143,10 +140,10 @@ export function render(contenedor, params = {}) {
           <div class="kpi__valor">${plata(ingresosMes)}</div>
           <div class="kpi__pie">${nombreMes(mes)}</div>
         </div>
-        <div class="kpi ${resultado >= 0 ? 'kpi--verde' : 'kpi--rojo'}">
-          <div class="kpi__etiqueta">Resultado del mes</div>
-          <div class="kpi__valor">${plata(resultado)}</div>
-          <div class="kpi__pie">${plata(egresosMes)} en gastos</div>
+        <div class="kpi ${capital >= 0 ? 'kpi--verde' : 'kpi--rojo'}">
+          <div class="kpi__etiqueta">Capital proyectado</div>
+          <div class="kpi__valor">${plata(capital)}</div>
+          <div class="kpi__pie">disponible + por cobrar − instalaciones</div>
         </div>
       </div>
 
@@ -242,11 +239,6 @@ export function render(contenedor, params = {}) {
                   </tr>`).join('')}
             </tbody>
           </table>
-        </div>
-        <div class="totales mt-16" style="max-width:300px;margin-left:auto">
-          <div><span>Ingresos</span><strong style="color:var(--verde)">${plata(ingresosMes)}</strong></div>
-          <div><span>Egresos</span><strong style="color:var(--rojo)">${plata(egresosMes)}</strong></div>
-          <div class="total"><span>Resultado</span><span>${plata(resultado)}</span></div>
         </div>` : `<div class="mini">Sin movimientos en ${nombreMes(mes)}.</div>`}
       </div>
     `;
