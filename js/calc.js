@@ -89,6 +89,11 @@ export function configVacia() {
     instalador: { roller: 15000, vertical: 20000, recargoPct: 50 },
     // Precio de contado y el mensaje que se le manda al cliente. Ver mensaje.js.
     contado: { descuentoPct: 35, plazoDias: 5, plantilla: '' },
+    // Punto de partida de la caja: lo que hay en el local y en el banco en el
+    // momento del corte. De ahí para adelante suman solos los cobros y los
+    // movimientos que cargues. Los importes reales no viven en el código: se
+    // cargan desde Caja. Ver saldosCaja() en dinero.js.
+    saldos: { desde: '', efectivo: 0, cuenta: 0 },
     minimoM2: 1,
     redondeo: 100, // redondea el precio unitario final al múltiplo indicado (0 = sin redondeo)
     iva: { activo: false, valor: 21 },

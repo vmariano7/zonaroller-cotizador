@@ -1,10 +1,9 @@
 // Flujo de caja: qué falta cobrar, qué falta pagar y cómo viene el mes.
 
-import { estado, guardar, borrar } from '../store.js';
-import { calcularTotales } from '../calc.js';
+import { estado, guardar, borrar, guardarConfig } from '../store.js';
 import { plata, fecha, esc, aviso, confirmar, modal, hoyISO, leerNumero, chip, capitalizar, ESTADOS_PEDIDO } from '../ui.js';
 import { navegar } from '../router.js';
-import { totalPedido, cobrado, saldo, costoInstalacion } from '../dinero.js';
+import { totalPedido, cobrado, saldo, costoInstalacion, saldosCaja, CAJAS, cajaDeMedio } from '../dinero.js';
 
 const MEDIOS = ['Transferencia', 'Efectivo', 'Débito', 'Crédito', 'Mercado Pago', 'Cheque', 'Otro'];
 const RUBROS_EGRESO = ['Telas y materiales', 'Instalación', 'Sueldos', 'Alquiler', 'Impuestos', 'Publicidad', 'Herramientas', 'Otro'];
@@ -12,6 +11,17 @@ const RUBROS_INGRESO = ['Cobro de pedido', 'Venta de mostrador', 'Reparación', 
 
 function mesDe(iso) {
   return String(iso || '').slice(0, 7);
+}
+
+/**
+ * El día del calendario de acá para un instante guardado en UTC. Sin esto, un
+ * corte hecho a las nueve de la noche se muestra con la fecha del día siguiente.
+ */
+function diaLocal(instante) {
+  const d = new Date(instante);
+  if (Number.isNaN(d.getTime())) return '';
+  d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
+  return d.toISOString().slice(0, 10);
 }
 
 function mesActual() {
@@ -81,7 +91,42 @@ export function render(contenedor, params = {}) {
       ...estado.movimientos.map((m) => mesDe(m.fecha)),
     ])].filter(Boolean).sort().reverse();
 
+    const sc = saldosCaja();
+
     cuerpo.innerHTML = `
+      <div class="tarjeta mb-16">
+        <div class="tarjeta__cab">
+          <div><h2>Lo que tenés ahora</h2><div class="mini">${sc.configurado
+            ? `Desde el punto de partida del ${fecha(diaLocal(sc.desde))} suman solos los cobros de clientes.`
+            : 'Cargá cuánto tenés hoy en cada lado y de ahí en más se actualiza solo.'}</div></div>
+          <div class="der"><button class="btn btn--chico" data-saldos>${sc.configurado ? 'Ajustar saldos' : 'Cargar saldos'}</button></div>
+        </div>
+        ${sc.configurado ? `
+        <div class="kpis">
+          <div class="kpi kpi--verde">
+            <div class="kpi__etiqueta">${esc(CAJAS.efectivo.nombre)}</div>
+            <div class="kpi__valor">${plata(sc.efectivo)}</div>
+            <div class="kpi__pie">${plata(sc.base.efectivo)} de partida ${sc.movio.efectivo >= 0 ? '+' : '−'} ${plata(Math.abs(sc.movio.efectivo))}</div>
+          </div>
+          <div class="kpi kpi--verde">
+            <div class="kpi__etiqueta">${esc(CAJAS.cuenta.nombre)}</div>
+            <div class="kpi__valor">${plata(sc.cuenta)}</div>
+            <div class="kpi__pie">${plata(sc.base.cuenta)} de partida ${sc.movio.cuenta >= 0 ? '+' : '−'} ${plata(Math.abs(sc.movio.cuenta))}</div>
+          </div>
+          <div class="kpi">
+            <div class="kpi__etiqueta">Total disponible</div>
+            <div class="kpi__valor">${plata(sc.total)}</div>
+            <div class="kpi__pie">local y banco juntos</div>
+          </div>
+        </div>
+        <div class="banner banner--info mt-16">
+          <div>Los cobros que registrás en cada pedido entran solos, en efectivo o en la cuenta
+          según el medio de pago. <strong>Los gastos no se descuentan solos</strong>: lo que le
+          pagás al instalador y todo lo demás se carga con <em>+ Movimiento</em>.</div>
+        </div>` : `
+        <div class="mini">Todavía no cargaste el punto de partida, así que no puedo decirte cuánto tenés.</div>`}
+      </div>
+
       <div class="kpis mb-16">
         <div class="kpi kpi--rojo">
           <div class="kpi__etiqueta">Por cobrar</div>
@@ -170,6 +215,7 @@ export function render(contenedor, params = {}) {
                   concepto: `Cobro de ${g.pedido.cliente?.nombre || 'cliente'}`,
                   sub: `${g.pedido.numero}${g.nota ? ` · ${g.nota}` : ''}`,
                   rubro: g.medio || 'Cobro',
+                  caja: g.caja || cajaDeMedio(g.medio),
                   monto: Number(g.monto) || 0,
                   tipo: 'ingreso',
                   id: null,
@@ -179,6 +225,7 @@ export function render(contenedor, params = {}) {
                   concepto: m.concepto,
                   sub: m.nota || '',
                   rubro: m.rubro || '',
+                  caja: m.caja || '',
                   monto: Number(m.monto) || 0,
                   tipo: m.tipo,
                   id: m.id,
@@ -189,7 +236,7 @@ export function render(contenedor, params = {}) {
                   <tr>
                     <td>${fecha(r.fecha)}</td>
                     <td>${esc(r.concepto)}${r.sub ? `<div class="mini">${esc(r.sub)}</div>` : ''}</td>
-                    <td class="mini">${esc(r.rubro)}</td>
+                    <td class="mini">${esc(r.rubro)}${r.caja ? `<div class="mini">${esc(CAJAS[r.caja]?.corto || '')}</div>` : ''}</td>
                     <td class="num" style="color:${r.tipo === 'ingreso' ? 'var(--verde)' : 'var(--rojo)'}"><strong>${r.tipo === 'ingreso' ? '+' : '−'} ${plata(r.monto)}</strong></td>
                     <td style="width:32px">${r.id ? `<button class="btn-icono" data-borrar-mov="${r.id}" title="Borrar">✕</button>` : ''}</td>
                   </tr>`).join('')}
@@ -213,22 +260,21 @@ export function render(contenedor, params = {}) {
       pintar();
     });
 
+    cuerpo.querySelector('[data-saldos]').addEventListener('click', () => dialogoSaldos(() => pintar()));
+
     cuerpo.querySelectorAll('[data-pagar-instal]').forEach((b) =>
       b.addEventListener('click', async () => {
         const pedido = estado.pedidos.find((p) => p.id === b.dataset.pagarInstal);
         if (!pedido) return;
         const monto = costoInstalacion(pedido);
-        if (!(await confirmar(`¿Registrar el pago de ${plata(monto)} al instalador por el pedido ${pedido.numero}?`, { textoOk: 'Registrar' }))) return;
+        // Solo marca la instalación como saldada. La salida de plata no se
+        // descuenta sola: se carga a mano con "+ Movimiento".
+        if (!(await confirmar(
+          `¿Marcar como pagada la instalación de ${plata(monto)} del pedido ${pedido.numero}? El movimiento en la caja lo cargás vos aparte.`,
+          { textoOk: 'Marcar pagada' }
+        ))) return;
         await guardar('pedidos', { ...pedido, instalacionPagada: true });
-        await guardar('movimientos', {
-          tipo: 'egreso',
-          fecha: hoyISO(),
-          concepto: `Instalación ${pedido.numero}`,
-          rubro: 'Instalación',
-          monto,
-          nota: pedido.cliente?.nombre || '',
-        });
-        aviso('Instalación marcada como pagada.');
+        aviso('Instalación marcada como pagada. Acordate de cargar el movimiento.');
         pintar();
       })
     );
@@ -245,6 +291,41 @@ export function render(contenedor, params = {}) {
   pintar();
 }
 
+/**
+ * Punto de partida de las dos cajas. Es un corte: lo que se cargó antes de
+ * apretar Guardar queda adentro de estos importes y deja de sumarse.
+ */
+function dialogoSaldos(alGuardar) {
+  const s = estado.config.saldos || {};
+  const m = modal('Punto de partida de la caja', `
+    <div class="mini mb-16">Poné lo que tenés <strong>ahora mismo</strong> en cada lado. Desde este
+    momento se van sumando solos los cobros que registres en los pedidos; todo lo cargado
+    hasta acá se considera parte de estos números.</div>
+    <div class="campos campos--2">
+      <div><label>${esc(CAJAS.efectivo.nombre)}</label>
+        <div class="con-prefijo"><span>$</span><input id="sd-efectivo" type="number" inputmode="decimal" step="1" value="${Number(s.efectivo) || 0}"></div>
+      </div>
+      <div><label>${esc(CAJAS.cuenta.nombre)}</label>
+        <div class="con-prefijo"><span>$</span><input id="sd-cuenta" type="number" inputmode="decimal" step="1" value="${Number(s.cuenta) || 0}"></div>
+      </div>
+    </div>
+    ${s.desde ? `<div class="mini mt-16">El corte actual es del ${fecha(diaLocal(s.desde))}. Al guardar se corre a hoy y se vuelve a arrancar de cero.</div>` : ''}
+    <div class="fila-botones fila-botones--fin mt-16">
+      <button class="btn btn--fantasma" data-cerrar>Cancelar</button>
+      <button class="btn btn--primario" id="sd-ok">Guardar saldos</button>
+    </div>`, { ancho: '520px' });
+
+  m.cuerpo.querySelector('#sd-ok').onclick = async () => {
+    const leer = (id) => Number(m.cuerpo.querySelector(id).value) || 0;
+    await guardarConfig({
+      saldos: { desde: new Date().toISOString(), efectivo: leer('#sd-efectivo'), cuenta: leer('#sd-cuenta') },
+    });
+    m.cerrar();
+    aviso('Saldos actualizados.');
+    alGuardar?.();
+  };
+}
+
 function dialogoMovimiento(alGuardar) {
   const m = modal('Nuevo movimiento', `
     <div class="campos campos--2">
@@ -252,8 +333,13 @@ function dialogoMovimiento(alGuardar) {
       <div><label>Fecha</label><input id="mv-fecha" type="date" value="${hoyISO()}"></div>
     </div>
     <div class="campo mt-16"><label>Concepto</label><input id="mv-concepto" placeholder="Ej. Compra de tela blackout"></div>
-    <div class="campos campos--2">
+    <div class="campos campos--3">
       <div><label>Rubro</label><select id="mv-rubro"></select></div>
+      <div><label>Sale de / entra en</label>
+        <select id="mv-caja">
+          ${Object.entries(CAJAS).map(([k, v]) => `<option value="${k}"${k === 'cuenta' ? ' selected' : ''}>${esc(v.nombre)}</option>`).join('')}
+        </select>
+      </div>
       <div><label>Monto</label><div class="con-prefijo"><span>$</span><input id="mv-monto" type="number" inputmode="decimal" min="0" step="1"></div></div>
     </div>
     <div class="campo mt-16"><label>Nota</label><input id="mv-nota" placeholder="Opcional"></div>
@@ -281,6 +367,7 @@ function dialogoMovimiento(alGuardar) {
       fecha: m.cuerpo.querySelector('#mv-fecha').value || hoyISO(),
       concepto,
       rubro: selRubro.value,
+      caja: m.cuerpo.querySelector('#mv-caja').value,
       monto,
       nota: m.cuerpo.querySelector('#mv-nota').value,
     });

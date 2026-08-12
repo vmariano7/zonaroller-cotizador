@@ -8,7 +8,7 @@ import {
 import { navegar } from '../router.js';
 import { imprimirOrdenTrabajo } from '../pdf.js';
 import { montarEditor, docVacio } from './editor.js';
-import { totalPedido, cobrado, saldo, costos, margen, venta } from '../dinero.js';
+import { totalPedido, cobrado, saldo, costos, margen, venta, CAJAS, cajaDeMedio } from '../dinero.js';
 
 /** Cómo va armada la cortina, en una línea. Vacío si no hay nada que decir. */
 const armado = (item) => [...detallesTecnicos(item), item.detalle].filter(Boolean).join(' · ');
@@ -598,10 +598,15 @@ export function renderDetalle(contenedor, params) {
         <div><label>Monto</label><div class="con-prefijo"><span>$</span><input id="pg-monto" type="number" inputmode="decimal" min="0" step="1" value="${Math.max(0, Math.round(debe))}"></div></div>
         <div><label>Fecha</label><input id="pg-fecha" type="date" value="${hoyISO()}"></div>
       </div>
-      <div class="campos campos--2 mt-16">
+      <div class="campos campos--3 mt-16">
         <div><label>Medio</label>
           <select id="pg-medio">
             <option>Transferencia</option><option>Efectivo</option><option>Débito</option><option>Crédito</option><option>Mercado Pago</option><option>Cheque</option><option>Otro</option>
+          </select>
+        </div>
+        <div><label>Entra en</label>
+          <select id="pg-caja">
+            ${Object.entries(CAJAS).map(([k, v]) => `<option value="${k}">${esc(v.nombre)}</option>`).join('')}
           </select>
         </div>
         <div><label>Nota</label><input id="pg-nota" placeholder="Ej. seña"></div>
@@ -610,6 +615,14 @@ export function renderDetalle(contenedor, params) {
         <button class="btn btn--fantasma" data-cerrar>Cancelar</button>
         <button class="btn btn--primario" id="pg-ok">Registrar</button>
       </div>`, { ancho: '520px' });
+
+    // La caja sigue al medio de pago, pero se puede corregir a mano: un
+    // "Otro" puede haber entrado en efectivo.
+    const selMedio = m.cuerpo.querySelector('#pg-medio');
+    const selCaja = m.cuerpo.querySelector('#pg-caja');
+    const sincronizarCaja = () => { selCaja.value = cajaDeMedio(selMedio.value); };
+    selMedio.addEventListener('change', sincronizarCaja);
+    sincronizarCaja();
 
     m.cuerpo.querySelector('#pg-ok').onclick = async () => {
       const monto = leerNumero(m.cuerpo.querySelector('#pg-monto').value);
@@ -621,12 +634,16 @@ export function renderDetalle(contenedor, params) {
         id: crypto.randomUUID(),
         monto,
         fecha: m.cuerpo.querySelector('#pg-fecha').value || hoyISO(),
-        medio: m.cuerpo.querySelector('#pg-medio').value,
+        medio: selMedio.value,
+        caja: selCaja.value,
+        // Cuándo se cargó, no cuándo dice el usuario que pasó: es lo que usa
+        // Caja para saber si el cobro es posterior al punto de partida.
+        creado: new Date().toISOString(),
         nota: m.cuerpo.querySelector('#pg-nota').value,
       };
       await guardar('pedidos', { ...p, pagos: [...(p.pagos || []), pago] });
       m.cerrar();
-      aviso(`Pago de ${plata(monto)} registrado.`);
+      aviso(`Pago de ${plata(monto)} registrado en ${CAJAS[pago.caja].corto.toLowerCase()}.`);
       renderDetalle(contenedor, params);
     };
   });
