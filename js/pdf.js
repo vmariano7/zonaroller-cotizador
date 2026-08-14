@@ -8,10 +8,10 @@ import { plata, num, fecha, esc, sumarDias, ajuste } from './ui.js';
 
 const NOMBRE_TIPO = { roller: 'Roller', vertical: 'Bandas verticales', zebra: 'Zebra', tela_tradicional: 'Cortina Tela Tradicional' };
 
-function montarHoja(html, tituloVentana) {
+export function montarHoja(html, tituloVentana, claseExtra = '') {
   document.querySelectorAll('.hoja').forEach((n) => n.remove());
   const hoja = document.createElement('div');
-  hoja.className = 'hoja';
+  hoja.className = `hoja${claseExtra ? ` ${claseExtra}` : ''}`;
   hoja.innerHTML = html;
   document.body.appendChild(hoja);
 

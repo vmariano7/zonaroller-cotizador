@@ -7,6 +7,7 @@ import {
 } from '../ui.js';
 import { navegar } from '../router.js';
 import { imprimirOrdenTrabajo } from '../pdf.js';
+import { imprimirRecibo } from '../recibo.js';
 import { montarEditor, docVacio } from './editor.js';
 import { totalPedido, cobrado, saldo, costos, margen, venta, CAJAS, cajaDeMedio } from '../dinero.js';
 
@@ -496,12 +497,24 @@ export function renderDetalle(contenedor, params) {
         <tbody>
           ${pagos.map((g) => `
             <tr>
-              <td>${fecha(g.fecha)}<div class="mini">${esc(g.medio || '')}${g.nota ? ` · ${esc(g.nota)}` : ''}</div></td>
+              <td>${fecha(g.fecha)}<div class="mini">${esc(g.medio || '')}${g.nota ? ` · ${esc(g.nota)}` : ''}${g.recibo ? ` · recibo ${esc(g.recibo)}` : ''}</div></td>
               <td class="num"><strong>${plata(g.monto)}</strong></td>
+              <td style="width:32px"><button class="btn-icono" data-recibo="${g.id}" title="Imprimir recibo">🧾</button></td>
               <td style="width:32px"><button class="btn-icono" data-borrar-pago="${g.id}" title="Borrar pago">✕</button></td>
             </tr>`).join('')}
         </tbody>
       </table>`;
+    // Reimprimir un recibo: el número no cambia, se asignó la primera vez.
+    caja.querySelectorAll('[data-recibo]').forEach((b) =>
+      b.addEventListener('click', async () => {
+        const actual = obtener('pedidos', p.id) || p;
+        const pago = (actual.pagos || []).find((g) => g.id === b.dataset.recibo);
+        if (!pago) return;
+        await imprimirRecibo(actual, pago);
+        renderDetalle(contenedor, params);
+      })
+    );
+
     caja.querySelectorAll('[data-borrar-pago]').forEach((b) =>
       b.addEventListener('click', async () => {
         if (!(await confirmar('¿Borrar este pago?', { textoOk: 'Borrar', peligro: true }))) return;
@@ -613,8 +626,9 @@ export function renderDetalle(contenedor, params) {
       </div>
       <div class="fila-botones fila-botones--fin mt-16">
         <button class="btn btn--fantasma" data-cerrar>Cancelar</button>
+        <button class="btn" id="pg-ok-recibo">Registrar e imprimir recibo</button>
         <button class="btn btn--primario" id="pg-ok">Registrar</button>
-      </div>`, { ancho: '520px' });
+      </div>`, { ancho: '560px' });
 
     // La caja sigue al medio de pago, pero se puede corregir a mano: un
     // "Otro" puede haber entrado en efectivo.
@@ -624,7 +638,7 @@ export function renderDetalle(contenedor, params) {
     selMedio.addEventListener('change', sincronizarCaja);
     sincronizarCaja();
 
-    m.cuerpo.querySelector('#pg-ok').onclick = async () => {
+    const registrar = async (conRecibo) => {
       const monto = leerNumero(m.cuerpo.querySelector('#pg-monto').value);
       if (!monto || monto <= 0) {
         aviso('Poné un monto válido.', 'error');
@@ -641,10 +655,14 @@ export function renderDetalle(contenedor, params) {
         creado: new Date().toISOString(),
         nota: m.cuerpo.querySelector('#pg-nota').value,
       };
-      await guardar('pedidos', { ...p, pagos: [...(p.pagos || []), pago] });
+      const guardado = await guardar('pedidos', { ...p, pagos: [...(p.pagos || []), pago] });
       m.cerrar();
       aviso(`Pago de ${plata(monto)} registrado en ${CAJAS[pago.caja].corto.toLowerCase()}.`);
+      if (conRecibo) await imprimirRecibo(guardado, pago);
       renderDetalle(contenedor, params);
     };
+
+    m.cuerpo.querySelector('#pg-ok').onclick = () => registrar(false);
+    m.cuerpo.querySelector('#pg-ok-recibo').onclick = () => registrar(true);
   });
 }

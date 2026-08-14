@@ -94,6 +94,9 @@ export function configVacia() {
     // movimientos que cargues. Los importes reales no viven en el código: se
     // cargan desde Caja. Ver saldosCaja() en dinero.js.
     saldos: { desde: '', efectivo: 0, cuenta: 0 },
+    // Numeración de los recibos de pago, para seguir la serie que ya venías
+    // haciendo a mano. Ver recibo.js.
+    recibos: { puntoVenta: '0001', proximo: 1 },
     minimoM2: 1,
     redondeo: 100, // redondea el precio unitario final al múltiplo indicado (0 = sin redondeo)
     iva: { activo: false, valor: 21 },
@@ -103,6 +106,7 @@ export function configVacia() {
       telefono: '',
       direccion: '',
       email: '',
+      cuit: '',
       validezDias: 15,
       formaPago: '50% de seña para iniciar el trabajo y el saldo contra entrega.',
     },

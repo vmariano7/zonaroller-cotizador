@@ -161,7 +161,15 @@ export function render(contenedor) {
         <div><label>Instagram</label><input data-emp="instagram" value="${esc(c.empresa?.instagram || '')}"></div>
         <div><label>Email</label><input data-emp="email" type="email" value="${esc(c.empresa?.email || '')}"></div>
         <div><label>Dirección</label><input data-emp="direccion" value="${esc(c.empresa?.direccion || '')}"></div>
+        <div><label>CUIT <span class="mini">(sale en los recibos)</span></label><input data-emp="cuit" value="${esc(c.empresa?.cuit || '')}"></div>
         <div><label>Validez del presupuesto</label><div class="con-sufijo"><input type="number" min="1" step="1" data-emp-num="validezDias" value="${c.empresa?.validezDias ?? 15}"><span>días</span></div></div>
+        <div>
+          <label>Recibos: punto de venta y próximo número</label>
+          <div style="display:flex;gap:.5rem">
+            <input data-rec="puntoVenta" style="width:90px" value="${esc(c.recibos?.puntoVenta || '0001')}">
+            <input type="number" min="1" step="1" data-rec-num="proximo" value="${c.recibos?.proximo ?? 1}">
+          </div>
+        </div>
       </div>
       <div class="campo mt-16"><label>Forma de pago (sale en el PDF)</label><textarea data-emp="formaPago">${esc(c.empresa?.formaPago || '')}</textarea></div>
     </div>
@@ -322,6 +330,18 @@ export function render(contenedor) {
       guardarPronto({ empresa: { ...estado.config.empresa, [inp.dataset.emp]: inp.value } })
     )
   );
+  /* ---- Numeración de recibos ---- */
+  contenedor.querySelectorAll('[data-rec]').forEach((inp) =>
+    inp.addEventListener('input', () =>
+      guardarPronto({ recibos: { ...estado.config.recibos, [inp.dataset.rec]: inp.value.trim() } })
+    )
+  );
+  contenedor.querySelectorAll('[data-rec-num]').forEach((inp) =>
+    inp.addEventListener('input', () =>
+      guardarPronto({ recibos: { ...estado.config.recibos, [inp.dataset.recNum]: leerCasillero(inp) } })
+    )
+  );
+
   contenedor.querySelectorAll('[data-emp-num]').forEach((inp) =>
     inp.addEventListener('input', () =>
       guardarPronto({ empresa: { ...estado.config.empresa, [inp.dataset.empNum]: leerCasillero(inp) } })
