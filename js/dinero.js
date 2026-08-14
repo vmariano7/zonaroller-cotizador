@@ -97,6 +97,17 @@ export function margen(pedido) {
   return totalPedido(pedido) - costos(pedido).total;
 }
 
+/**
+ * El objetivo del mes: la suma de los gastos fijos.
+ *
+ * Son los que se repiten todos los meses por el mismo importe. No se cargan
+ * como movimientos ni descuentan de los saldos —para eso está + Movimiento—:
+ * lo único que hacen es marcar cuánto hay que juntar para que el mes cierre.
+ */
+export function objetivoMes() {
+  return (estado.config?.gastosFijos || []).reduce((a, g) => a + (Number(g.monto) || 0), 0);
+}
+
 /* ---------- Las dos cajas ---------- */
 
 export const CAJAS = {

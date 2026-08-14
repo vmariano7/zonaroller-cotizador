@@ -1,9 +1,9 @@
 // Flujo de caja: qué falta cobrar, qué falta pagar y cómo viene el mes.
 
 import { estado, guardar, borrar, guardarConfig } from '../store.js';
-import { plata, fecha, esc, aviso, confirmar, modal, hoyISO, leerNumero, chip, capitalizar, ESTADOS_PEDIDO } from '../ui.js';
+import { plata, num, fecha, esc, aviso, confirmar, modal, hoyISO, leerNumero, chip, capitalizar, ESTADOS_PEDIDO } from '../ui.js';
 import { navegar } from '../router.js';
-import { totalPedido, cobrado, saldo, costoInstalacion, saldosCaja, CAJAS, cajaDeMedio } from '../dinero.js';
+import { totalPedido, cobrado, saldo, costoInstalacion, saldosCaja, objetivoMes, CAJAS, cajaDeMedio } from '../dinero.js';
 
 const MEDIOS = ['Transferencia', 'Efectivo', 'Débito', 'Crédito', 'Mercado Pago', 'Cheque', 'Otro'];
 const RUBROS_EGRESO = ['Telas y materiales', 'Instalación', 'Sueldos', 'Alquiler', 'Impuestos', 'Publicidad', 'Herramientas', 'Otro'];
@@ -93,7 +93,42 @@ export function render(contenedor, params = {}) {
     // pagarle al instalador por lo que todavía no se instaló.
     const capital = sc.total + porCobrar - aPagarInstal;
 
+    // Objetivo del mes: cubrir los gastos fijos con el capital proyectado.
+    const objetivo = objetivoMes();
+    const pct = objetivo > 0 ? (capital / objetivo) * 100 : 0;
+    const cubierto = capital >= objetivo;
+    const falta = objetivo - capital;
+
     cuerpo.innerHTML = `
+      <div class="tarjeta mb-16">
+        <div class="tarjeta__cab">
+          <div><h2>Objetivo del mes</h2><div class="mini">Cubrir los gastos fijos con el capital proyectado.</div></div>
+          <div class="der"><button class="btn btn--chico" data-gastos-fijos>${objetivo > 0 ? 'Gastos fijos' : 'Cargar gastos fijos'}</button></div>
+        </div>
+        ${objetivo > 0 ? `
+        <div class="meta">
+          <div class="meta__pct ${cubierto ? 'meta__pct--ok' : ''}">${num(Math.min(pct, 999), 0)}%</div>
+          <div class="meta__cuerpo">
+            <div class="meta__barra" role="progressbar" aria-valuemin="0" aria-valuemax="100"
+                 aria-valuenow="${num(Math.min(pct, 100), 0)}"
+                 aria-label="Avance sobre los gastos fijos del mes">
+              <div class="meta__relleno ${cubierto ? 'meta__relleno--ok' : ''}" style="width:${Math.max(0, Math.min(pct, 100))}%"></div>
+            </div>
+            <div class="meta__pie">
+              <span>Capital proyectado <strong>${plata(capital)}</strong></span>
+              <span>Objetivo <strong>${plata(objetivo)}</strong></span>
+            </div>
+          </div>
+        </div>
+        <div class="banner ${cubierto ? 'banner--logrado' : 'banner--info'} mt-16">
+          <div>${cubierto
+            ? `Mes cubierto. Te sobran <strong>${plata(capital - objetivo)}</strong> por encima de los gastos fijos.`
+            : `Te faltan <strong>${plata(falta)}</strong> para cubrir los gastos fijos del mes.`}</div>
+        </div>` : `
+        <div class="mini">Cargá tus gastos fijos —alquiler, sueldos, impuestos— y acá vas a ver
+        qué porcentaje del mes tenés cubierto. No se descuentan de la caja: solo arman el objetivo.</div>`}
+      </div>
+
       <div class="tarjeta mb-16">
         <div class="tarjeta__cab">
           <div><h2>Lo que tenés ahora</h2><div class="mini">${sc.configurado
@@ -253,6 +288,7 @@ export function render(contenedor, params = {}) {
     });
 
     cuerpo.querySelector('[data-saldos]').addEventListener('click', () => dialogoSaldos(() => pintar()));
+    cuerpo.querySelector('[data-gastos-fijos]').addEventListener('click', () => dialogoGastosFijos(() => pintar()));
 
     cuerpo.querySelectorAll('[data-pagar-instal]').forEach((b) =>
       b.addEventListener('click', async () => {
@@ -281,6 +317,80 @@ export function render(contenedor, params = {}) {
   }
 
   pintar();
+}
+
+/**
+ * Los gastos que se repiten todos los meses por el mismo importe. Viven en la
+ * configuración, no en los movimientos: no descuentan de la caja, solo arman
+ * el objetivo del mes.
+ */
+function dialogoGastosFijos(alGuardar) {
+  const lista = (estado.config.gastosFijos || []).map((g) => ({ ...g }));
+  if (!lista.length) lista.push({ id: crypto.randomUUID(), concepto: '', monto: 0 });
+
+  const m = modal('Gastos fijos del mes', `
+    <div class="mini mb-16">Lo que pagás todos los meses pase lo que pase: alquiler, sueldos,
+    impuestos, servicios. <strong>No se descuentan de la caja</strong> ni aparecen como
+    movimientos: solo definen cuánto tenés que juntar para que el mes cierre.</div>
+    <div data-filas></div>
+    <button class="btn btn--chico mt-16" data-agregar style="width:100%">+ Agregar gasto</button>
+    <div class="totales mt-16">
+      <div class="total"><span>Objetivo del mes</span><span data-total></span></div>
+    </div>
+    <div class="fila-botones fila-botones--fin mt-16">
+      <button class="btn btn--fantasma" data-cerrar>Cancelar</button>
+      <button class="btn btn--primario" id="gf-ok">Guardar</button>
+    </div>`, { ancho: '560px' });
+
+  const cajaFilas = m.cuerpo.querySelector('[data-filas]');
+  const cajaTotal = m.cuerpo.querySelector('[data-total]');
+
+  function pintarFilas() {
+    cajaFilas.innerHTML = lista.map((g, i) => `
+      <div class="campo" style="display:flex;align-items:center;gap:.5rem;margin-bottom:.5rem">
+        <input data-concepto="${i}" placeholder="Ej. Alquiler" value="${esc(g.concepto || '')}" style="flex:1">
+        <div class="con-prefijo" style="width:150px"><span>$</span>
+          <input type="number" inputmode="decimal" min="0" step="1" data-monto="${i}" value="${Number(g.monto) || 0}">
+        </div>
+        <button class="btn-icono" data-quitar="${i}" title="Quitar">&#10005;</button>
+      </div>`).join('');
+
+    cajaTotal.textContent = plata(lista.reduce((a, g) => a + (Number(g.monto) || 0), 0));
+
+    cajaFilas.querySelectorAll('[data-concepto]').forEach((inp) =>
+      inp.addEventListener('input', () => { lista[Number(inp.dataset.concepto)].concepto = inp.value; })
+    );
+    cajaFilas.querySelectorAll('[data-monto]').forEach((inp) =>
+      inp.addEventListener('input', () => {
+        lista[Number(inp.dataset.monto)].monto = Number(inp.value) || 0;
+        cajaTotal.textContent = plata(lista.reduce((a, g) => a + (Number(g.monto) || 0), 0));
+      })
+    );
+    cajaFilas.querySelectorAll('[data-quitar]').forEach((b) =>
+      b.addEventListener('click', () => {
+        lista.splice(Number(b.dataset.quitar), 1);
+        if (!lista.length) lista.push({ id: crypto.randomUUID(), concepto: '', monto: 0 });
+        pintarFilas();
+      })
+    );
+  }
+  pintarFilas();
+
+  m.cuerpo.querySelector('[data-agregar]').addEventListener('click', () => {
+    lista.push({ id: crypto.randomUUID(), concepto: '', monto: 0 });
+    pintarFilas();
+  });
+
+  m.cuerpo.querySelector('#gf-ok').onclick = async () => {
+    // Las filas vacías se descartan solas: no hace falta borrarlas a mano.
+    const limpia = lista
+      .filter((g) => g.concepto.trim() || Number(g.monto) > 0)
+      .map((g) => ({ id: g.id || crypto.randomUUID(), concepto: g.concepto.trim(), monto: Number(g.monto) || 0 }));
+    await guardarConfig({ gastosFijos: limpia });
+    m.cerrar();
+    aviso(limpia.length ? 'Gastos fijos actualizados.' : 'Gastos fijos vacíos.');
+    alGuardar?.();
+  };
 }
 
 /**

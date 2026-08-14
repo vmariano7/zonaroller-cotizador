@@ -97,6 +97,9 @@ export function configVacia() {
     // Numeración de los recibos de pago, para seguir la serie que ya venías
     // haciendo a mano. Ver recibo.js.
     recibos: { puntoVenta: '0001', proximo: 1 },
+    // Lo que pagás todos los meses pase lo que pase: [{ id, concepto, monto }].
+    // No son movimientos, no tocan la caja; arman el objetivo del mes. Ver Caja.
+    gastosFijos: [],
     minimoM2: 1,
     redondeo: 100, // redondea el precio unitario final al múltiplo indicado (0 = sin redondeo)
     iva: { activo: false, valor: 21 },

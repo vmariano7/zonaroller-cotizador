@@ -465,6 +465,22 @@ tbody tr:hover { background: var(--fondo-2); }
 .banner--aviso { background: var(--amarillo-fondo); color: var(--amarillo); }
 .banner--info { background: var(--azul-fondo); color: var(--azul); }
 .banner--error { background: var(--rojo-fondo); color: var(--rojo); }
+.banner--logrado { background: var(--verde-fondo); color: var(--verde); }
+
+/* Objetivo del mes: una sola medida contra su meta. */
+.meta { display: flex; align-items: center; gap: 1.2rem; }
+.meta__pct { font-size: 2.6rem; font-weight: 800; line-height: 1; letter-spacing: -.03em; min-width: 4.2ch; color: var(--acento); }
+.meta__pct--ok { color: var(--verde); }
+.meta__cuerpo { flex: 1; min-width: 0; }
+.meta__barra { height: 16px; border-radius: 999px; background: var(--fondo-3); overflow: hidden; }
+.meta__relleno { height: 100%; border-radius: 999px; background: var(--acento); transition: width .35s ease; }
+.meta__relleno--ok { background: var(--verde); }
+.meta__pie { display: flex; justify-content: space-between; gap: 1rem; flex-wrap: wrap; font-size: .82rem; color: var(--tinta-2); margin-top: .5rem; }
+
+@media (max-width: 560px) {
+  .meta { flex-direction: column; align-items: stretch; gap: .7rem; }
+  .meta__pct { min-width: 0; }
+}
 .banner .btn { margin-left: auto; flex: none; }
 
 /* ---------- Gráficos ---------- */
