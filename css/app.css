@@ -587,6 +587,7 @@ tbody tr:hover { background: var(--fondo-2); }
 .hoja__totales { margin-left: auto; width: 260px; font-size: 10pt; }
 .hoja__totales div { display: flex; justify-content: space-between; padding: 3px 0; }
 .hoja__totales .total { border-top: 1.5px solid #000; margin-top: 4px; padding-top: 6px; font-size: 12pt; font-weight: 800; }
+.hoja__totales .contado { margin-top: 2px; font-size: 9.5pt; font-weight: 700; color: #1a7a3d; }
 .hoja__pie { margin-top: 20px; padding-top: 10px; border-top: .5px solid #bbb; font-size: 8.5pt; line-height: 1.5; }
 
 /* Recibo de pago: copia el que se hacía a mano, hasta en los textos. */

@@ -5,6 +5,7 @@
 import { estado } from './store.js';
 import { calcularTotales, descripcionItem, detallesTecnicos } from './calc.js';
 import { plata, num, fecha, esc, sumarDias, ajuste } from './ui.js';
+import { datosContado } from './mensaje.js';
 
 const NOMBRE_TIPO = { roller: 'Roller', vertical: 'Bandas verticales', zebra: 'Zebra', tela_tradicional: 'Cortina Tela Tradicional' };
 
@@ -63,6 +64,7 @@ export function imprimirPresupuesto(p) {
   const t = calcularTotales(p.items, estado.config, { descuentoPct: p.descuentoPct });
   const dias = p.validezDias ?? emp.validezDias ?? 15;
   const validez = sumarDias(p.fecha, dias);
+  const ctd = datosContado(p, estado.config, t.total);
 
   const html = `
     ${encabezado(emp)}
@@ -109,6 +111,7 @@ export function imprimirPresupuesto(p) {
       ${ajuste(t) ? `<div><span>${esc(ajuste(t).etiqueta)}</span><span>${esc(ajuste(t).monto)}</span></div>` : ''}
       ${t.montoIva ? `<div><span>IVA ${num(t.ivaPct, 0)}%</span><span>${plata(t.montoIva)}</span></div>` : ''}
       <div class="total"><span>Total</span><span>${plata(t.total)}</span></div>
+      <div class="contado"><span>Pagando de contado (${num(ctd.pct, 1)}% off)</span><span>${plata(ctd.contado)}</span></div>
     </div>
 
     <div class="hoja__pie">
