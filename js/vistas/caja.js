@@ -81,11 +81,7 @@ export function render(contenedor, params = {}) {
     const pagosMes = activos.flatMap((p) =>
       (p.pagos || []).filter((g) => mesDe(g.fecha) === mes).map((g) => ({ ...g, pedido: p }))
     );
-    const cobradoMes = pagosMes.reduce((a, g) => a + (Number(g.monto) || 0), 0);
-
     const movsMes = estado.movimientos.filter((m) => mesDe(m.fecha) === mes);
-    const ingresosExtra = movsMes.filter((m) => m.tipo === 'ingreso').reduce((a, m) => a + (Number(m.monto) || 0), 0);
-    const ingresosMes = cobradoMes + ingresosExtra;
 
     // Presupuestos abiertos (todavía no confirmados)
     const enJuego = estado.presupuestos
@@ -185,11 +181,6 @@ export function render(contenedor, params = {}) {
           <div class="kpi__etiqueta">Producción pendiente</div>
           <div class="kpi__valor">${plata(aPagarFabrica)}</div>
           <div class="kpi__pie">${pendientesProduccion.length} pedido${pendientesProduccion.length === 1 ? '' : 's'} sin mandar a fábrica</div>
-        </div>
-        <div class="kpi kpi--verde">
-          <div class="kpi__etiqueta">Cobrado en el mes</div>
-          <div class="kpi__valor">${plata(ingresosMes)}</div>
-          <div class="kpi__pie">${nombreMes(mes)}</div>
         </div>
         <div class="kpi ${capital >= 0 ? 'kpi--verde' : 'kpi--rojo'}">
           <div class="kpi__etiqueta">Capital proyectado</div>
