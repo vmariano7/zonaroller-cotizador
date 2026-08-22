@@ -3,7 +3,7 @@
 import { estado, guardar, borrar, guardarConfig } from '../store.js';
 import { plata, num, fecha, esc, aviso, confirmar, modal, hoyISO, leerNumero, chip, capitalizar, ESTADOS_PEDIDO } from '../ui.js';
 import { navegar } from '../router.js';
-import { totalPedido, cobrado, saldo, costoInstalacion, saldosCaja, objetivoMes, CAJAS, cajaDeMedio } from '../dinero.js';
+import { totalPedido, cobrado, saldo, costoInstalacion, costos, saldosCaja, objetivoMes, CAJAS, cajaDeMedio } from '../dinero.js';
 
 const MEDIOS = ['Transferencia', 'Efectivo', 'Débito', 'Crédito', 'Mercado Pago', 'Cheque', 'Otro'];
 const RUBROS_EGRESO = ['Telas y materiales', 'Instalación', 'Sueldos', 'Alquiler', 'Impuestos', 'Publicidad', 'Herramientas', 'Otro'];
@@ -67,6 +67,16 @@ export function render(contenedor, params = {}) {
       .sort((a, b) => String(a.pedido.fechaInstalacion || '9999').localeCompare(String(b.pedido.fechaInstalacion || '9999')));
     const aPagarInstal = instalaciones.reduce((a, i) => a + i.monto, 0);
 
+    // Pedidos pendientes: todavía no se mandaron a producción, así que tampoco
+    // se le pagó nada a la fábrica por ellos. Apenas el pedido pasa de estado
+    // (a "En producción" o el que sea), sale solo de esta cuenta.
+    const pendientesProduccion = activos
+      .filter((p) => p.estado === 'pendiente')
+      .map((p) => ({ pedido: p, monto: costos(p).materiales }))
+      .filter((i) => i.monto > 0)
+      .sort((a, b) => String(b.pedido.fecha || '').localeCompare(String(a.pedido.fecha || '')));
+    const aPagarFabrica = pendientesProduccion.reduce((a, i) => a + i.monto, 0);
+
     // Movimientos del mes
     const pagosMes = activos.flatMap((p) =>
       (p.pagos || []).filter((g) => mesDe(g.fecha) === mes).map((g) => ({ ...g, pedido: p }))
@@ -90,8 +100,9 @@ export function render(contenedor, params = {}) {
 
     const sc = saldosCaja();
     // Con lo que hay hoy, más lo que los clientes deben, menos lo que hay que
-    // pagarle al instalador por lo que todavía no se instaló.
-    const capital = sc.total + porCobrar - aPagarInstal;
+    // pagarle al instalador por lo que todavía no se instaló y menos lo que
+    // va a salir a producción (pedidos "pendiente") en cuanto se le pague a la fábrica.
+    const capital = sc.total + porCobrar - aPagarInstal - aPagarFabrica;
 
     // Objetivo del mes: cubrir los gastos fijos con el capital proyectado.
     const objetivo = objetivoMes();
@@ -170,6 +181,11 @@ export function render(contenedor, params = {}) {
           <div class="kpi__valor">${plata(aPagarInstal)}</div>
           <div class="kpi__pie">${instalaciones.length} pedido${instalaciones.length === 1 ? '' : 's'}</div>
         </div>
+        <div class="kpi">
+          <div class="kpi__etiqueta">Producción pendiente</div>
+          <div class="kpi__valor">${plata(aPagarFabrica)}</div>
+          <div class="kpi__pie">${pendientesProduccion.length} pedido${pendientesProduccion.length === 1 ? '' : 's'} sin mandar a fábrica</div>
+        </div>
         <div class="kpi kpi--verde">
           <div class="kpi__etiqueta">Cobrado en el mes</div>
           <div class="kpi__valor">${plata(ingresosMes)}</div>
@@ -178,7 +194,7 @@ export function render(contenedor, params = {}) {
         <div class="kpi ${capital >= 0 ? 'kpi--verde' : 'kpi--rojo'}">
           <div class="kpi__etiqueta">Capital proyectado</div>
           <div class="kpi__valor">${plata(capital)}</div>
-          <div class="kpi__pie">disponible + por cobrar − instalaciones</div>
+          <div class="kpi__pie">disponible + por cobrar − instalaciones − producción</div>
         </div>
       </div>
 
@@ -187,7 +203,7 @@ export function render(contenedor, params = {}) {
         <a class="btn btn--chico" href="#/presupuestos">Revisar</a>
       </div>
 
-      <div class="grid grid--2">
+      <div class="grid grid--3">
         <div class="tarjeta">
           <div class="tarjeta__cab"><span class="seccion-num">1</span><h2>Clientes que deben</h2></div>
           ${deudores.length ? `
@@ -225,11 +241,30 @@ export function render(contenedor, params = {}) {
             </table>
           </div>` : '<div class="mini">No tenés instalaciones pendientes de pago.</div>'}
         </div>
+
+        <div class="tarjeta">
+          <div class="tarjeta__cab"><span class="seccion-num">3</span><h2>Producción pendiente</h2></div>
+          ${pendientesProduccion.length ? `
+          <div class="tabla-scroll">
+            <table>
+              <thead><tr><th>Pedido</th><th class="num">Monto</th></tr></thead>
+              <tbody>
+                ${pendientesProduccion.map(({ pedido, monto }) => `
+                  <tr data-pedido="${pedido.id}" style="cursor:pointer">
+                    <td>${esc(pedido.numero)}<div class="mini">${esc(pedido.cliente?.nombre || '')} · ${fecha(pedido.fecha)}</div></td>
+                    <td class="num">${plata(monto)}</td>
+                  </tr>`).join('')}
+              </tbody>
+            </table>
+          </div>
+          <div class="mini mt-16">Cuando le pagués a la fábrica, cambiá el estado del pedido a
+          "En producción" y sale solo de esta lista.</div>` : '<div class="mini">No tenés pedidos pendientes de mandar a producción.</div>'}
+        </div>
       </div>
 
       <div class="tarjeta">
         <div class="tarjeta__cab">
-          <span class="seccion-num">3</span><h2>Movimientos</h2>
+          <span class="seccion-num">4</span><h2>Movimientos</h2>
           <div class="der">
             <select data-mes style="width:auto">
               ${meses.map((m) => `<option value="${m}"${m === mes ? ' selected' : ''}>${nombreMes(m)}</option>`).join('')}
