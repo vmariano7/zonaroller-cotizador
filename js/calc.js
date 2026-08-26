@@ -27,7 +27,6 @@ export const TIPOS = {
     paños: [1, 2],
     recogimientos: ['Derecha', 'Izquierda', 'Central', 'Motorizada Izquierda', 'Motorizada Derecha', 'Motorizada Central', 'Sin Guía'],
     pliegues: ['Pellizco simple', 'Pellizco doble', 'Tabla encontrada', 'Tabla pisada'],
-    rieles: ['RIEL ALUM PREMIUM TT03', 'RIEL ALUM TT04', 'RIEL PVC PREMIUM TTM1', 'RIEL PVC TTM2'],
   },
 };
 
@@ -59,7 +58,7 @@ export const ARMADO = {
 /**
  * Qué se elige en cada tipo. Las bandas verticales no llevan cadena, caída ni
  * caño: se recogen hacia un lado, así que van comando y recogimiento.
- * La tela tradicional tiene los suyos propios (paños, pliegue, riel…).
+ * La tela tradicional tiene los suyos propios (paños, pliegue, recogimiento).
  */
 export const ARMADO_POR_TIPO = {
   roller: ['comando', 'cadena', 'caida', 'sistemaCano'],
@@ -131,8 +130,6 @@ export function itemVacio(tipo = 'roller') {
       cantPaños: 1,
       recogimiento: t.recogimientos[0],
       pliegue: t.pliegues[0],
-      riel: t.rieles[0],
-      rielColor: 'BLANCO',
       anchoM: null,
       altoM: null,
       cantidad: 1,
@@ -173,14 +170,19 @@ export function detallesTecnicos(item) {
 
 /**
  * Descripción de línea para tela tradicional: "Cortina Tela [TELA] [COLOR]
- * [ANCHO]x[ALTO]m [RIEL] [RECOGIMIENTO]". Devuelve null para los demás tipos,
+ * [ANCHO]x[ALTO]m [RECOGIMIENTO]". Devuelve null para los demás tipos,
  * que ya se describen con tipo + tela.
+ *
+ * El riel ya no se elige al cotizar, pero los renglones viejos lo tienen
+ * guardado: si está, se sigue mostrando tal como salió en su momento.
  */
 export function descripcionItem(item) {
   if (item.tipo !== 'tela_tradicional') return null;
   const ancho = Number(item.anchoM) || 0;
   const alto = Number(item.altoM) || 0;
-  return `Cortina Tela ${item.tela} ${item.color} ${ancho}x${alto}m ${item.riel} ${item.recogimiento}`;
+  return ['Cortina Tela', item.tela, item.color, `${ancho}x${alto}m`, item.riel, item.recogimiento]
+    .filter(Boolean)
+    .join(' ');
 }
 
 /** Ancho a partir del cual el instalador cobra el recargo. */

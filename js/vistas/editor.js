@@ -18,6 +18,13 @@ export function docVacio() {
   };
 }
 
+/**
+ * Con qué nombre entra un presupuesto que se guardó sin cargar a la persona.
+ * Pasa seguido en el mostrador: se cotiza, se imprime y recién si la venta
+ * avanza se piden los datos.
+ */
+export const CLIENTE_POR_DEFECTO = 'Consumidor final';
+
 /* ---------- Íconos de cada tipo de cortina ---------- */
 
 const ICONOS = {
@@ -44,7 +51,7 @@ const ICONOS = {
  * Monta el editor dentro de `contenedor`.
  * Devuelve { leer(), totales(), enfocarCliente() }.
  */
-export function montarEditor(contenedor, doc, { alCambiar } = {}) {
+export function montarEditor(contenedor, doc, { alCambiar, clienteOpcional = false } = {}) {
   // Durante el armado inicial no avisamos hacia afuera: quien nos llama todavía
   // no terminó de construir su propio estado.
   let montado = false;
@@ -71,8 +78,8 @@ export function montarEditor(contenedor, doc, { alCambiar } = {}) {
       <div class="plegable__cuerpo" hidden>
         <div class="campos campos--2">
           <div>
-            <label for="c-nombre">Nombre y apellido</label>
-            <input id="c-nombre" data-cli="nombre" autocomplete="off" list="zr-clientes" placeholder="Ej. María González">
+            <label for="c-nombre">Nombre y apellido${clienteOpcional ? ' <span class="mini">(opcional)</span>' : ''}</label>
+            <input id="c-nombre" data-cli="nombre" autocomplete="off" list="zr-clientes" placeholder="${clienteOpcional ? esc(CLIENTE_POR_DEFECTO) : 'Ej. María González'}">
             <datalist id="zr-clientes">${sugerencias().map((s) => `<option value="${esc(s.nombre)}">`).join('')}</datalist>
           </div>
           <div><label for="c-tel">Teléfono</label><input id="c-tel" data-cli="telefono" type="tel" inputmode="tel" autocomplete="tel" placeholder="261 555 0000"></div>
@@ -155,7 +162,9 @@ export function montarEditor(contenedor, doc, { alCambiar } = {}) {
     const partes = [c.telefono, c.direccion].filter(Boolean);
     resumenCliente.textContent = c.nombre?.trim()
       ? `${c.nombre}${partes.length ? ` · ${partes.join(' · ')}` : ''}`
-      : 'Sin cargar — tocá para completar';
+      : clienteOpcional
+        ? `Sin cargar — se guarda como ${CLIENTE_POR_DEFECTO}`
+        : 'Sin cargar — tocá para completar';
   }
 
   // Si ya viene un cliente cargado (editando), lo dejamos plegado igual: el
@@ -247,8 +256,6 @@ export function montarEditor(contenedor, doc, { alCambiar } = {}) {
       if (!t.colores.includes(item.color)) item.color = t.colores[0];
       if (!t.recogimientos.includes(item.recogimiento)) item.recogimiento = t.recogimientos[0];
       if (!t.pliegues.includes(item.pliegue)) item.pliegue = t.pliegues[0];
-      if (!t.rieles.includes(item.riel)) item.riel = t.rieles[0];
-      if (!item.rielColor) item.rielColor = 'BLANCO';
       if (![1, 2].includes(Number(item.cantPaños))) item.cantPaños = 1;
     }
 
@@ -324,13 +331,6 @@ export function montarEditor(contenedor, doc, { alCambiar } = {}) {
             ${selectLista('cantPaños', 'Cant. paños', tt.paños, item.cantPaños)}
             ${selectLista('recogimiento', 'Recogimiento', tt.recogimientos, item.recogimiento)}
             ${selectLista('pliegue', 'Tipo de pliegue', tt.pliegues, item.pliegue)}
-          </div>
-          <div class="campos campos--2 mt-16">
-            ${selectLista('riel', 'Riel', tt.rieles, item.riel)}
-            <div>
-              <label>Riel color</label>
-              <input data-campo="rielColor" placeholder="BLANCO" value="${esc(item.rielColor || '')}">
-            </div>
           </div>
     ` : `
           <div class="campos campos--4 mt-16">
@@ -440,7 +440,6 @@ export function montarEditor(contenedor, doc, { alCambiar } = {}) {
 
     if (item.tipo === 'tela_tradicional') {
       partes.push(`${num(c.anchoM)} × ${num(c.altoM)} m`);
-      if (item.riel) partes.push(esc(item.riel));
       if (item.recogimiento) partes.push(esc(item.recogimiento));
       const descripcion = descripcionItem(item);
       if (descripcion) partes.unshift(`<span class="mini">${esc(descripcion)}</span>`);

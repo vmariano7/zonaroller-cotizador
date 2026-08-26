@@ -1,6 +1,6 @@
 // Pantalla de cotización: crea o edita un presupuesto.
 
-import { montarEditor, docVacio } from './editor.js';
+import { montarEditor, docVacio, CLIENTE_POR_DEFECTO } from './editor.js';
 import { guardar, obtener, proximoNumero } from '../store.js';
 import { plata, aviso, confirmar } from '../ui.js';
 import { navegar } from '../router.js';
@@ -19,7 +19,7 @@ export function render(contenedor, params = {}) {
     <div class="titulo-pagina">
       <div>
         <h1>${existente ? `Presupuesto ${existente.numero}` : 'Nuevo presupuesto'}</h1>
-        <div class="sub">${existente ? 'Editando un presupuesto guardado' : 'Cargá el cliente y las cortinas para ver el total en vivo'}</div>
+        <div class="sub">${existente ? 'Editando un presupuesto guardado' : 'Cargá las cortinas y mirá el total en vivo. El cliente es opcional.'}</div>
       </div>
     </div>
     <div data-editor></div>
@@ -29,6 +29,7 @@ export function render(contenedor, params = {}) {
   const barra = contenedor.querySelector('.resumen-fijo');
   const editor = montarEditor(contenedor.querySelector('[data-editor]'), doc, {
     alCambiar: () => pintarBarra(),
+    clienteOpcional: true,
   });
 
   function pintarBarra() {
@@ -47,11 +48,10 @@ export function render(contenedor, params = {}) {
 
   async function guardarDoc() {
     const d = editor.leer();
-    if (!d.cliente.nombre?.trim()) {
-      aviso('Poné al menos el nombre del cliente.', 'error');
-      editor.enfocarCliente();
-      return;
-    }
+    // El nombre no frena el guardado: muchas cotizaciones se arman sin datos de
+    // la persona y lo que hace falta es el PDF ya. Si va en blanco entra como
+    // consumidor final y se completa después si la venta avanza.
+    if (!d.cliente.nombre?.trim()) d.cliente.nombre = CLIENTE_POR_DEFECTO;
     const t = editor.totales();
     const registro = {
       ...(existente || {}),
