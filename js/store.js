@@ -1,11 +1,24 @@
-// Capa de datos: caché local siempre + sincronización con Supabase cuando está configurada.
-// Las credenciales de Supabase NUNCA viven en el código: las carga el usuario en
-// Configuración y quedan en el localStorage de cada dispositivo.
+// Capa de datos: caché local siempre + sincronización con Supabase.
+//
+// La URL y la clave pública de acá abajo son públicas a propósito: son las que
+// viajan dentro de cualquier app web de Supabase y por sí solas no abren nada.
+// Está verificado: sin sesión, las cinco tablas contestan 401. Lo que da acceso
+// es el email y la contraseña, no la clave.
+//
+// Esto se apoya en dos cosas que viven en Supabase, no acá:
+//   1. RLS prendido y política solo para "authenticated" (privado/supabase.sql).
+//   2. El registro público apagado, así que nadie puede crearse una cuenta.
+// Si alguna de las dos se desactiva, esta clave pasa a ser una puerta abierta.
 
 import { configVacia } from './calc.js';
 
+export const SUPABASE = {
+  url: 'https://jnldoyyctyvxgwngwqsl.supabase.co',
+  clave: 'sb_publishable__RaSRNt6pICCVjvGGAjOJg_E4EMDKrK',
+};
+
 const CLAVE_DATOS = 'zr_datos_v1';
-const CLAVE_CONEXION = 'zr_conexion_v1';
+const CLAVE_SESION = 'zr_sesion_v1';
 
 export const COLECCIONES = ['presupuestos', 'pedidos', 'agenda', 'movimientos'];
 const TABLAS = {
@@ -24,6 +37,7 @@ export const estado = {
   pedidos: [],
   agenda: [],
   movimientos: [],
+  sesion: { activa: false, email: '' },
   sync: { activa: false, estado: 'local', mensaje: 'Guardando solo en este dispositivo', ultima: null },
 };
 
@@ -42,53 +56,93 @@ function avisar() {
   });
 }
 
-/* ---------- Conexión a Supabase ---------- */
+/* ---------- Sesión ---------- */
 
-export function leerConexion() {
+export function leerSesion() {
   try {
-    return JSON.parse(localStorage.getItem(CLAVE_CONEXION)) || null;
+    const s = JSON.parse(localStorage.getItem(CLAVE_SESION));
+    return s?.refresh_token ? s : null;
   } catch {
     return null;
   }
 }
 
-export function guardarConexion(url, clave) {
-  const limpia = (url || '').trim().replace(/\/+$/, '');
-  if (!limpia || !clave) {
-    localStorage.removeItem(CLAVE_CONEXION);
-    estado.sync = { activa: false, estado: 'local', mensaje: 'Guardando solo en este dispositivo', ultima: null };
-    avisar();
-    return;
-  }
-  localStorage.setItem(CLAVE_CONEXION, JSON.stringify({ url: limpia, clave: clave.trim() }));
-}
-
-function cabeceras(conexion, extra = {}) {
-  return {
-    apikey: conexion.clave,
-    Authorization: `Bearer ${conexion.clave}`,
-    'Content-Type': 'application/json',
-    ...extra,
+/** Guarda lo que devuelve Supabase y anota cuándo hay que renovar. */
+function anotarSesion(datos, email) {
+  const sesion = {
+    access_token: datos.access_token,
+    refresh_token: datos.refresh_token,
+    // Un minuto de colchón: no queremos usar un token que vence en el camino.
+    expira: Date.now() + (Number(datos.expires_in) || 3600) * 1000 - 60000,
+    email: datos.user?.email || email || '',
   };
+  localStorage.setItem(CLAVE_SESION, JSON.stringify(sesion));
+  estado.sesion = { activa: true, email: sesion.email };
+  return sesion;
 }
 
-async function pedir(conexion, ruta, opciones = {}) {
-  const res = await fetch(`${conexion.url}/rest/v1/${ruta}`, {
+export function cerrarSesion() {
+  localStorage.removeItem(CLAVE_SESION);
+  estado.sesion = { activa: false, email: '' };
+  estado.sync = { activa: false, estado: 'local', mensaje: 'Sin sesión — guardando solo en este dispositivo', ultima: null };
+  avisar();
+}
+
+async function pedirToken(cuerpo, tipo) {
+  const res = await fetch(`${SUPABASE.url}/auth/v1/token?grant_type=${tipo}`, {
+    method: 'POST',
+    headers: { apikey: SUPABASE.clave, 'Content-Type': 'application/json' },
+    body: JSON.stringify(cuerpo),
+  });
+  const datos = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(datos.error_description || datos.msg || datos.error || `Error ${res.status}`);
+  return datos;
+}
+
+export async function iniciarSesion(email, contrasena) {
+  const datos = await pedirToken({ email: String(email || '').trim(), password: contrasena }, 'password');
+  anotarSesion(datos, email);
+  avisar();
+  return true;
+}
+
+/**
+ * Un access token vigente, renovándolo si venció. Devuelve null si no hay
+ * sesión o si el refresh ya no sirve (ahí hay que volver a entrar).
+ */
+async function token() {
+  const s = leerSesion();
+  if (!s) return null;
+  if (s.access_token && Date.now() < Number(s.expira || 0)) return s.access_token;
+  try {
+    const datos = await pedirToken({ refresh_token: s.refresh_token }, 'refresh_token');
+    return anotarSesion(datos, s.email).access_token;
+  } catch {
+    // Sin internet no se puede renovar, pero la sesión sigue siendo válida:
+    // se reintenta en la próxima sincronización.
+    if (!navigator.onLine) return null;
+    cerrarSesion();
+    return null;
+  }
+}
+
+async function pedir(ruta, opciones = {}) {
+  const t = await token();
+  if (!t) throw new Error('Se venció la sesión. Entrá de nuevo.');
+  const res = await fetch(`${SUPABASE.url}/rest/v1/${ruta}`, {
     ...opciones,
-    headers: cabeceras(conexion, opciones.headers),
+    headers: {
+      apikey: SUPABASE.clave,
+      Authorization: `Bearer ${t}`,
+      'Content-Type': 'application/json',
+      ...opciones.headers,
+    },
   });
   if (!res.ok) {
     const texto = await res.text().catch(() => '');
     throw new Error(`Supabase ${res.status}: ${texto.slice(0, 200)}`);
   }
   return res.status === 204 ? null : res.json().catch(() => null);
-}
-
-export async function probarConexion(url, clave) {
-  const conexion = { url: (url || '').trim().replace(/\/+$/, ''), clave: (clave || '').trim() };
-  if (!conexion.url || !conexion.clave) throw new Error('Falta la URL o la clave.');
-  await pedir(conexion, `${TABLAS.presupuestos}?select=id&limit=1`);
-  return true;
 }
 
 /* ---------- Caché local ---------- */
@@ -126,18 +180,19 @@ export async function iniciar() {
       estado[c] = Array.isArray(local[c]) ? local[c] : [];
     });
   }
+
+  const s = leerSesion();
+  estado.sesion = { activa: !!s, email: s?.email || '' };
   avisar();
 
-  const conexion = leerConexion();
-  if (conexion) await sincronizar();
+  if (s) await sincronizar();
   return estado;
 }
 
 /** Trae todo desde Supabase y reemplaza la caché local. */
 export async function sincronizar() {
-  const conexion = leerConexion();
-  if (!conexion) {
-    estado.sync = { activa: false, estado: 'local', mensaje: 'Guardando solo en este dispositivo', ultima: null };
+  if (!leerSesion()) {
+    estado.sync = { activa: false, estado: 'local', mensaje: 'Sin sesión — guardando solo en este dispositivo', ultima: null };
     avisar();
     return;
   }
@@ -146,8 +201,8 @@ export async function sincronizar() {
 
   try {
     const [config, ...resto] = await Promise.all([
-      pedir(conexion, `${TABLAS.config}?select=*&id=eq.principal`),
-      ...COLECCIONES.map((c) => pedir(conexion, `${TABLAS[c]}?select=*&borrado=is.false&order=actualizado.desc`)),
+      pedir(`${TABLAS.config}?select=*&id=eq.principal`),
+      ...COLECCIONES.map((c) => pedir(`${TABLAS[c]}?select=*&borrado=is.false&order=actualizado.desc`)),
     ]);
 
     if (Array.isArray(config) && config[0]?.datos) {
@@ -180,8 +235,7 @@ export async function sincronizar() {
 /* ---------- Escritura ---------- */
 
 async function subirFila(coleccion, registro) {
-  const conexion = leerConexion();
-  if (!conexion) return;
+  if (!leerSesion()) return;
   const fila = {
     id: registro.id,
     datos: { ...registro },
@@ -190,7 +244,7 @@ async function subirFila(coleccion, registro) {
   };
   delete fila.datos.actualizado;
   try {
-    await pedir(conexion, `${TABLAS[coleccion]}?on_conflict=id`, {
+    await pedir(`${TABLAS[coleccion]}?on_conflict=id`, {
       method: 'POST',
       headers: { Prefer: 'resolution=merge-duplicates,return=minimal' },
       body: JSON.stringify(fila),
@@ -207,10 +261,9 @@ export async function guardarConfig(nuevaConfig) {
   escribirLocal();
   avisar();
 
-  const conexion = leerConexion();
-  if (!conexion) return;
+  if (!leerSesion()) return;
   try {
-    await pedir(conexion, `${TABLAS.config}?on_conflict=id`, {
+    await pedir(`${TABLAS.config}?on_conflict=id`, {
       method: 'POST',
       headers: { Prefer: 'resolution=merge-duplicates,return=minimal' },
       body: JSON.stringify({ id: 'principal', datos: estado.config, actualizado: new Date().toISOString() }),
@@ -247,10 +300,9 @@ export async function borrar(coleccion, id) {
   escribirLocal();
   avisar();
 
-  const conexion = leerConexion();
-  if (!conexion) return;
+  if (!leerSesion()) return;
   try {
-    await pedir(conexion, `${TABLAS[coleccion]}?id=eq.${encodeURIComponent(id)}`, {
+    await pedir(`${TABLAS[coleccion]}?id=eq.${encodeURIComponent(id)}`, {
       method: 'PATCH',
       headers: { Prefer: 'return=minimal' },
       body: JSON.stringify({ borrado: true, actualizado: new Date().toISOString() }),
@@ -308,7 +360,7 @@ export async function importarRespaldo(datos, { reemplazar = false } = {}) {
   escribirLocal();
   avisar();
 
-  if (leerConexion()) {
+  if (leerSesion()) {
     await guardarConfig(estado.config);
     for (const c of COLECCIONES) {
       for (const r of estado[c]) await subirFila(c, r);

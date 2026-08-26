@@ -1,9 +1,10 @@
 // Arranque de la aplicación.
 
-import { iniciar, suscribir, estado, sincronizar } from './store.js';
+import { iniciar, suscribir, estado, sincronizar, leerSesion } from './store.js';
 import { definirRutas, iniciarRouter, recargarVista } from './router.js';
 import { $, $$, esc, aviso, modal } from './ui.js';
 import { tienePin, estaDesbloqueado, pedirPin, bloquear } from './candado.js';
+import { pedirIngreso } from './ingreso.js';
 
 import * as vCotizar from './vistas/cotizar.js';
 import * as vPresupuestos from './vistas/presupuestos.js';
@@ -108,6 +109,9 @@ async function arrancar() {
   pintarNav();
   suscribir(pintarSync);
 
+  // Sin sesión no hay nada que mostrar: los datos viven en la nube y la nube
+  // no contesta sin login. Con sesión guardada entra derecho, aun sin internet.
+  if (!leerSesion()) await pedirIngreso();
   await iniciar();
   pintarSync();
 
@@ -116,6 +120,14 @@ async function arrancar() {
   iniciarRouter($('#vista'), { onCambio: marcarNav });
 
   $('#sync').addEventListener('click', async () => {
+    // Si el refresh murió, el store cierra la sesión: hay que volver a entrar
+    // antes de que sincronizar sirva de algo.
+    if (!leerSesion()) {
+      await pedirIngreso({ vencida: true });
+      await sincronizar();
+      recargarVista();
+      return;
+    }
     await sincronizar();
     aviso(estado.sync.mensaje, estado.sync.estado === 'error' ? 'error' : 'ok');
     recargarVista();

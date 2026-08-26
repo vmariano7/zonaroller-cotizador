@@ -1,7 +1,7 @@
 // Configuración: costos, incrementos, reglas de cálculo, datos de la empresa,
 // sincronización con la nube y respaldos.
 
-import { estado, guardarConfig, leerConexion, guardarConexion, probarConexion, sincronizar, exportarRespaldo, importarRespaldo } from '../store.js';
+import { estado, guardarConfig, cerrarSesion, sincronizar, exportarRespaldo, importarRespaldo } from '../store.js';
 import { TIPOS, SISTEMAS } from '../calc.js';
 import { esc, aviso, confirmar, descargarArchivo, fecha } from '../ui.js';
 import { PLANTILLA_POR_DEFECTO, CLAVES } from '../mensaje.js';
@@ -16,7 +16,6 @@ function guardarPronto(parcial) {
 
 export function render(contenedor) {
   const c = estado.config;
-  const conexion = leerConexion();
 
   contenedor.innerHTML = `
     <div class="titulo-pagina">
@@ -209,24 +208,21 @@ export function render(contenedor) {
     <div class="tarjeta">
       <div class="tarjeta__cab">
         <span class="seccion-num">07</span>
-        <div><h2>Sincronización</h2><div class="mini">Para ver los mismos datos en la compu y en el celular.</div></div>
+        <div><h2>Tu cuenta</h2><div class="mini">Con la misma cuenta ves los mismos datos en la compu y en el celular.</div></div>
       </div>
       <div class="banner banner--${estado.sync.estado === 'error' ? 'error' : estado.sync.activa ? 'info' : 'aviso'}">
         <div>
-          <strong>${estado.sync.activa ? (estado.sync.estado === 'error' ? 'Con problemas' : 'Nube conectada') : 'Solo en este dispositivo'}</strong><br>
+          <strong>${estado.sync.activa ? (estado.sync.estado === 'error' ? 'Con problemas' : 'Nube conectada') : 'Sin sesión'}</strong><br>
           ${esc(estado.sync.mensaje)}${estado.sync.ultima ? ` · última: ${fecha(estado.sync.ultima, { conHora: true })}` : ''}
         </div>
       </div>
-      <div class="campos campos--2">
-        <div><label>URL del proyecto Supabase</label><input data-sb-url placeholder="https://xxxxx.supabase.co" value="${esc(conexion?.url || '')}"></div>
-        <div><label>Clave pública (anon)</label><input data-sb-key type="password" placeholder="eyJhbGci…" value="${esc(conexion?.clave || '')}"></div>
-      </div>
+      ${estado.sesion.activa ? `<div class="campo"><label>Sesión iniciada</label><input value="${esc(estado.sesion.email)}" readonly></div>` : ''}
       <div class="fila-botones mt-16">
-        <button class="btn btn--primario" data-sb-guardar>Conectar</button>
         <button class="btn" data-sb-sinc>Sincronizar ahora</button>
-        ${conexion ? '<button class="btn btn--fantasma" data-sb-borrar>Desconectar este dispositivo</button>' : ''}
+        ${estado.sesion.activa ? '<button class="btn btn--fantasma" data-sb-salir>Cerrar sesión</button>' : ''}
       </div>
-      <div class="mini mt-16">La clave se guarda solo en este dispositivo, nunca en el código de la página. Tenés que cargarla una vez en cada aparato que uses.</div>
+      <div class="mini mt-16">No hay claves que cargar: la app entra sola con tu cuenta y se sincroniza en
+      cualquier aparato donde inicies sesión. Cerrá sesión solo si prestás el dispositivo.</div>
     </div>
 
     <div class="tarjeta">
@@ -243,9 +239,9 @@ export function render(contenedor) {
         ${tienePin() ? '<button class="btn btn--fantasma" data-pin-quitar>Quitar el PIN</button>' : ''}
       </div>
       <div class="banner banner--aviso mt-16">
-        <div>Esto tapa la información de una mirada rápida, pero no es seguridad de verdad:
-        la página es pública y se puede saltear mirando el código. Lo que sí protege tus datos
-        es que la clave de Supabase no está publicada — sin ella la app no lee nada.</div>
+        <div>Es un candado extra, para que alguien que agarre el celular desbloqueado no vea
+        la facturación de un vistazo. Lo que protege tus datos de verdad es tu cuenta:
+        sin iniciar sesión la app no lee ni escribe nada en la nube.</div>
       </div>
     </div>
 
@@ -372,36 +368,19 @@ export function render(contenedor) {
   });
 
   /* ---- Sincronización ---- */
-  contenedor.querySelector('[data-sb-guardar]').addEventListener('click', async (e) => {
-    const url = contenedor.querySelector('[data-sb-url]').value.trim();
-    const clave = contenedor.querySelector('[data-sb-key]').value.trim();
-    const btn = e.currentTarget;
-    btn.disabled = true;
-    btn.textContent = 'Probando…';
-    try {
-      await probarConexion(url, clave);
-      guardarConexion(url, clave);
-      await sincronizar();
-      aviso('Conectado. Tus datos ya se sincronizan.');
-      render(contenedor);
-    } catch (err) {
-      aviso(`No pude conectar: ${err.message}`, 'error');
-      btn.disabled = false;
-      btn.textContent = 'Conectar';
-    }
-  });
-
   contenedor.querySelector('[data-sb-sinc]').addEventListener('click', async () => {
     await sincronizar();
     aviso(estado.sync.estado === 'ok' ? 'Sincronizado.' : estado.sync.mensaje, estado.sync.estado === 'ok' ? 'ok' : 'error');
     render(contenedor);
   });
 
-  contenedor.querySelector('[data-sb-borrar]')?.addEventListener('click', async () => {
-    if (!(await confirmar('¿Desconectar este dispositivo de la nube? Los datos quedan guardados acá y en la nube.', { textoOk: 'Desconectar' }))) return;
-    guardarConexion('', '');
-    aviso('Dispositivo desconectado.');
-    render(contenedor);
+  contenedor.querySelector('[data-sb-salir]')?.addEventListener('click', async () => {
+    if (!(await confirmar(
+      '¿Cerrar sesión en este dispositivo? Vas a tener que entrar de nuevo con tu email y contraseña. Los datos quedan guardados en la nube.',
+      { textoOk: 'Cerrar sesión' }
+    ))) return;
+    cerrarSesion();
+    location.reload();
   });
 
   /* ---- PIN ---- */

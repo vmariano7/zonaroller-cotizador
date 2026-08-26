@@ -3,8 +3,8 @@
 // Ojo con las expectativas: esto NO es seguridad real. La página es pública y
 // cualquiera que sepa mirar el código la puede saltear. Sirve para que alguien
 // que agarre tu celular desbloqueado no vea la facturación de un vistazo.
-// Lo que sí protege los datos de verdad es que la clave de Supabase no está en
-// el código: sin esa clave la app no tiene de dónde leer nada.
+// Lo que sí protege los datos de verdad es la sesión: sin login, Supabase no
+// contesta nada. Ver ingreso.js.
 
 import { estado, guardarConfig } from './store.js';
 import { el } from './ui.js';
