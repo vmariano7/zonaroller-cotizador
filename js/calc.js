@@ -3,6 +3,8 @@
 //          + lo que te sale el instalador. Eso da el precio de CONTADO; el de
 //          lista sale de inflarlo para que aguante el descuento (ver factorLista).
 //          Todo multiplicado por la cantidad.
+// Tela tradicional usa su propia fórmula fija en vez de tela + sistema, pero
+// pasa por el mismo incremento e igual conversión a contado/lista.
 // Ningún lado se cobra por debajo del metro: ver MINIMO_LADO_M.
 
 export const TIPOS = {
@@ -83,6 +85,7 @@ export function configVacia() {
       roller: { activo: true, valor: 0 },
       vertical: { activo: true, valor: 0 },
       zebra: { activo: true, valor: 0 },
+      tela_tradicional: { activo: true, valor: 0 },
     },
     // Lo que te sale el instalador. Se traslada al precio final de la cortina:
     // al cliente no se le cobra aparte, ya viene adentro. Ver costoInstaladorItem.
@@ -332,8 +335,9 @@ export function calcularItem(item, config, contexto = {}) {
 
 /**
  * Cortina Tela Tradicional: fórmula propia, sin tela/sistema de precios
- * configurables. Precio = (40.478,56 × ancho) + (900,38 × alto)
- * + (7.944,82 × ancho × alto), en metros.
+ * configurables. Precio base = (40.478,56 × ancho) + (900,38 × alto)
+ * + (7.944,82 × ancho × alto), en metros. Sobre eso sí se le puede aplicar
+ * un incremento (ganancia), igual que a los demás tipos.
  */
 function calcularItemTelaTradicional(item, config, contexto = {}) {
   const anchoM = Number(item.anchoM) || 0;
@@ -345,7 +349,12 @@ function calcularItemTelaTradicional(item, config, contexto = {}) {
   const altoCobrado = ladoCobrado(altoM);
 
   const m2Real = anchoM * altoM;
-  const formula = 40478.56 * anchoCobrado + 900.38 * altoCobrado + 7944.82 * anchoCobrado * altoCobrado;
+  const base = 40478.56 * anchoCobrado + 900.38 * altoCobrado + 7944.82 * anchoCobrado * altoCobrado;
+
+  const reglaInc = config.incrementos?.tela_tradicional || { activo: false, valor: 0 };
+  const incrementoPct = reglaInc.activo ? Number(reglaInc.valor) || 0 : 0;
+  const montoIncremento = base * (incrementoPct / 100);
+  const conIncremento = base + montoIncremento;
 
   const costoInstaladorUnit = item.costoInstaladorFijado != null && Number.isFinite(Number(item.costoInstaladorFijado))
     ? Number(item.costoInstaladorFijado)
@@ -354,7 +363,7 @@ function calcularItemTelaTradicional(item, config, contexto = {}) {
   const fijado = item.precioFijado != null && Number.isFinite(Number(item.precioFijado));
   const precioUnitario = fijado
     ? Number(item.precioFijado)
-    : redondear((formula + costoInstaladorUnit) * factorLista(config), config.redondeo);
+    : redondear((conIncremento + costoInstaladorUnit) * factorLista(config), config.redondeo);
 
   const costoPropio = item.costoFijado != null && Number.isFinite(Number(item.costoFijado))
     ? (Number(item.costoFijado) + costoInstaladorUnit) * cantidad
@@ -374,10 +383,10 @@ function calcularItemTelaTradicional(item, config, contexto = {}) {
     precioSistema: 0,
     costoTela: 0,
     costoSistema: 0,
-    base: formula,
-    incrementoPct: 0,
-    montoIncremento: 0,
-    conIncremento: formula,
+    base,
+    incrementoPct,
+    montoIncremento,
+    conIncremento,
     precioUnitario,
     total: precioUnitario * cantidad,
     costoInstalador: costoInstaladorUnit * cantidad,

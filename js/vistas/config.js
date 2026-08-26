@@ -42,7 +42,7 @@ export function render(contenedor) {
           </div>`).join('')}
       </div>
       <div class="banner banner--info" style="margin-top:1rem">
-        <div><strong>Cortina Tela Tradicional</strong> no usa estos costos: su precio sale de una fórmula fija propia (ancho, alto y ancho×alto), configurada directamente en el código.</div>
+        <div><strong>Cortina Tela Tradicional</strong> no usa estos costos: su precio base sale de una fórmula fija propia (ancho, alto y ancho×alto), configurada directamente en el código. El porcentaje de ganancia sobre esa fórmula sí se configura, en Incrementos.</div>
       </div>
     </div>
 
@@ -95,7 +95,7 @@ export function render(contenedor) {
             <span class="seccion-num">03</span>
             <div><h2>Incrementos</h2><div class="mini">Activá y definí el porcentaje por artículo.</div></div>
           </div>
-          ${Object.entries(TIPOS).filter(([tipo]) => tipo !== 'tela_tradicional').map(([tipo, def]) => {
+          ${Object.entries(TIPOS).map(([tipo, def]) => {
             const inc = c.incrementos?.[tipo] || { activo: true, valor: 0 };
             return `
             <div class="campo" style="display:flex;align-items:center;gap:.6rem">
@@ -110,7 +110,9 @@ export function render(contenedor) {
             </div>`;
           }).join('')}
           <div class="banner banner--info" style="margin:1rem 0 0">
-            <div>El incremento se calcula sobre tela y sistema. La instalación se suma después, sin incremento.</div>
+            <div>En Roller, Verticales y Zebra el incremento se calcula sobre tela y sistema.
+            En Tela Tradicional se calcula sobre la fórmula fija del renglón de arriba.
+            En todos los casos la instalación se suma después, sin incremento.</div>
           </div>
         </div>
 
@@ -299,11 +301,15 @@ export function render(contenedor) {
   );
 
   /* ---- Incrementos ---- */
+  // Si el tipo todavía no tiene entrada guardada (por ejemplo, recién se
+  // sumó "tela_tradicional" a un config viejo), arranca con el mismo default
+  // que se usa para pintar el checkbox, así el primer guardado queda completo.
+  const incDefault = (tipo) => estado.config.incrementos?.[tipo] || { activo: true, valor: 0 };
   contenedor.querySelectorAll('[data-inc-activo]').forEach((inp) =>
     inp.addEventListener('change', () => {
       const tipo = inp.dataset.incActivo;
       const incrementos = { ...estado.config.incrementos };
-      incrementos[tipo] = { ...incrementos[tipo], activo: inp.checked };
+      incrementos[tipo] = { ...incDefault(tipo), activo: inp.checked };
       guardarPronto({ incrementos });
     })
   );
@@ -311,7 +317,7 @@ export function render(contenedor) {
     inp.addEventListener('input', () => {
       const tipo = inp.dataset.incValor;
       const incrementos = { ...estado.config.incrementos };
-      incrementos[tipo] = { ...incrementos[tipo], valor: leerCasillero(inp) };
+      incrementos[tipo] = { ...incDefault(tipo), valor: leerCasillero(inp) };
       guardarPronto({ incrementos });
     })
   );
