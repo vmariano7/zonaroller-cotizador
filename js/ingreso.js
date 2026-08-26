@@ -12,6 +12,29 @@
 import { iniciarSesion, estado } from './store.js';
 import { el } from './ui.js';
 
+/**
+ * Traduce el error a algo que se pueda accionar.
+ *
+ * `fetch` tira un TypeError seco —"Failed to fetch" en Chrome, "Load failed" en
+ * Safari— para todo lo que pasa antes de la respuesta: sin internet, un bloqueador
+ * o antivirus que corta el pedido, o el reloj del equipo tan corrido que el
+ * certificado parece inválido. Al usuario "Failed to fetch" no le dice nada.
+ */
+function explicar(err) {
+  const msg = String(err?.message || '');
+  if (/invalid login/i.test(msg)) return 'Email o contraseña incorrectos.';
+  if (/email not confirmed/i.test(msg)) return 'Falta confirmar el email de esta cuenta.';
+
+  const esDeRed = err instanceof TypeError
+    || /failed to fetch|networkerror|load failed|network request failed/i.test(msg);
+  if (!esDeRed) return `No pude entrar. ${msg}`;
+
+  if (!navigator.onLine) return 'Este equipo está sin internet. Conectate y probá de nuevo.';
+  return 'No pude conectarme con el servidor. Suele ser el antivirus o una extensión '
+    + 'del navegador bloqueando el pedido, o la fecha y hora del equipo mal puestas. '
+    + 'Probá en una ventana de incógnito y revisá el reloj de la PC.';
+}
+
 /** Muestra la pantalla y resuelve cuando la sesión quedó abierta. */
 export function pedirIngreso({ vencida = false } = {}) {
   return new Promise((resolve) => {
@@ -61,9 +84,7 @@ export function pedirIngreso({ vencida = false } = {}) {
         resolve();
       } catch (err) {
         error.hidden = false;
-        error.textContent = /invalid login/i.test(err.message)
-          ? 'Email o contraseña incorrectos.'
-          : `No pude entrar. ${err.message}`;
+        error.textContent = explicar(err);
         campoPass.value = '';
         campoPass.focus();
       } finally {
