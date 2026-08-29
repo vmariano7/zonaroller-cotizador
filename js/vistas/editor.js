@@ -19,6 +19,50 @@ export function docVacio() {
 }
 
 /**
+ * Lee una medida tipeada a mano, en metros. Acepta coma y punto.
+ *
+ * Los casilleros son <input type="text">, no "number", a propósito: en el
+ * celular el teclado da coma, y un input numérico con coma adentro devuelve
+ * cadena vacía —el HTML solo admite punto—, así que la medida se perdía sin
+ * que se notara. Con texto la leemos nosotros y aceptamos las dos.
+ */
+export function leerMedida(texto) {
+  const limpio = String(texto ?? '').trim().replace(',', '.');
+  if (limpio === '') return null;
+  const n = Number(limpio);
+  return Number.isFinite(n) && n >= 0 ? n : null;
+}
+
+/** Cómo se muestra una medida en el casillero: con coma, como se escribe acá. */
+function mostrarMedida(metros) {
+  if (metros == null || !Number.isFinite(Number(metros))) return '';
+  return String(Number(metros)).replace('.', ',');
+}
+
+/** Las medidas de una cortina en metros, sin importar en qué unidad las guarde. */
+function medidasEnMetros(item) {
+  return item.tipo === 'tela_tradicional'
+    ? { ancho: item.anchoM ?? null, alto: item.altoM ?? null }
+    : {
+      ancho: item.anchoCm == null ? null : item.anchoCm / 100,
+      alto: item.altoCm == null ? null : item.altoCm / 100,
+    };
+}
+
+/** Escribe las medidas en la unidad que guarda ese tipo. Modifica `item`. */
+function ponerMedidas(item, { ancho, alto }) {
+  if (item.tipo === 'tela_tradicional') {
+    item.anchoM = ancho;
+    item.altoM = alto;
+  } else {
+    // El redondeo evita que 1,15 × 100 quede en 114,99999 y termine en 114 cm.
+    item.anchoCm = ancho == null ? null : Math.round(ancho * 100);
+    item.altoCm = alto == null ? null : Math.round(alto * 100);
+  }
+  return item;
+}
+
+/**
  * Con qué nombre entra un presupuesto que se guardó sin cargar a la persona.
  * Pasa seguido en el mostrador: se cotiza, se imprime y recién si la venta
  * avanza se piden los datos.
@@ -273,8 +317,8 @@ export function montarEditor(contenedor, doc, { alCambiar, clienteOpcional = fal
     // tipos siguen guardándose en centímetros (los presupuestos viejos y la orden
     // de trabajo hablan en cm), y `data-metros` hace la conversión al vuelo.
     const campoMedida = (campoM, campoCm) => (esTelaTradicional
-      ? `<input data-campo="${campoM}" type="number" inputmode="decimal" min="0" step="0.01" placeholder="0" value="${item[campoM] ?? ''}">`
-      : `<input data-metros="${campoCm}" type="number" inputmode="decimal" min="0" step="0.01" placeholder="0" value="${item[campoCm] != null ? item[campoCm] / 100 : ''}">`
+      ? `<input data-medida="${campoM}" type="text" inputmode="decimal" placeholder="0" value="${mostrarMedida(item[campoM])}">`
+      : `<input data-metros="${campoCm}" type="text" inputmode="decimal" placeholder="0" value="${mostrarMedida(item[campoCm] == null ? null : item[campoCm] / 100)}">`
     ) + '<span>m</span>';
     const campoAncho = campoMedida('anchoM', 'anchoCm');
     const campoAlto = campoMedida('altoM', 'altoCm');
@@ -383,15 +427,21 @@ export function montarEditor(contenedor, doc, { alCambiar, clienteOpcional = fal
         if (item.tipo === b.dataset.tipo) return;
         // Cambiar de tipo cambia los campos: rearmamos el renglón desde cero
         // conservando lo que sí sigue teniendo sentido.
+        //
+        // Las medidas se conservan aunque cada tipo las guarde en su unidad
+        // (los rollers en centímetros, la tela tradicional en metros): así se
+        // puede tocar un tipo y otro para comparar el precio del mismo vano
+        // sin volver a tipearlas.
+        const medidas = medidasEnMetros(item);
         const base = itemVacio(b.dataset.tipo);
-        modelo.items[indice] = {
+        modelo.items[indice] = ponerMedidas({
           ...base,
           id: item.id,
           ambiente: item.ambiente,
           cantidad: item.cantidad,
           instalacion: item.instalacion,
           detalle: item.detalle,
-        };
+        }, medidas);
         pintarItems();
       })
     );
@@ -419,7 +469,19 @@ export function montarEditor(contenedor, doc, { alCambiar, clienteOpcional = fal
     nodo.querySelectorAll('[data-metros]').forEach((inp) => {
       const campo = inp.dataset.metros;
       inp.addEventListener('input', () => {
-        item[campo] = inp.value === '' ? null : Math.round(Number(inp.value) * 100);
+        const m = leerMedida(inp.value);
+        item[campo] = m == null ? null : Math.round(m * 100);
+        pintarResumen(nodo, item);
+        pintarTotales();
+        avisar();
+      });
+    });
+
+    // Tela tradicional guarda las medidas en metros, tal cual se tipean.
+    nodo.querySelectorAll('[data-medida]').forEach((inp) => {
+      const campo = inp.dataset.medida;
+      inp.addEventListener('input', () => {
+        item[campo] = leerMedida(inp.value);
         pintarResumen(nodo, item);
         pintarTotales();
         avisar();
