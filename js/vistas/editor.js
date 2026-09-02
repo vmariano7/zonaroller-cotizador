@@ -2,7 +2,7 @@
 // El orden importa: primero las cortinas (que es lo que se cotiza a diario) y
 // los datos del cliente arriba, plegados, para que no tapen lo principal.
 
-import { TIPOS, SISTEMAS, ARMADO, ARMADO_POR_TIPO, itemVacio, calcularItem, calcularTotales, hayPreciosCargados, descripcionItem, detallesTecnicos } from '../calc.js';
+import { TIPOS, SISTEMAS, ARMADO, ARMADO_POR_TIPO, itemVacio, calcularItem, calcularTotales, hayPreciosCargados, descripcionItem, detallesTecnicos, admiteMotor } from '../calc.js';
 import { estado } from '../store.js';
 import { el, esc, plata, num, leerNumero, hoyISO, aviso } from '../ui.js';
 import { armarMensaje, datosContado, copiar } from '../mensaje.js';
@@ -397,6 +397,14 @@ export function montarEditor(contenedor, doc, { alCambiar, clienteOpcional = fal
             </label>
             <span>La instalamos nosotros <span class="mini">(ya viene dentro del precio)</span></span>
           </div>
+          ${admiteMotor(item.tipo) ? `
+          <div class="check mt-16">
+            <label class="switch">
+              <input type="checkbox" data-campo="automatizada"${item.automatizada ? ' checked' : ''}>
+              <span class="switch__pista"></span>
+            </label>
+            <span>Automatizada <span class="mini">(motor ${plata(Number(config.costoMotor) || 0)}, va al costo, sin ganancia)</span></span>
+          </div>` : ''}
         </details>
     `;
 
@@ -441,6 +449,9 @@ export function montarEditor(contenedor, doc, { alCambiar, clienteOpcional = fal
           cantidad: item.cantidad,
           instalacion: item.instalacion,
           detalle: item.detalle,
+          // Solo la roller se automatiza, pero el tilde se recuerda: si volvés
+          // a roller después de mirar otro tipo, sigue puesto.
+          ...(item.automatizada ? { automatizada: true } : {}),
         }, medidas);
         pintarItems();
       })
@@ -511,6 +522,7 @@ export function montarEditor(contenedor, doc, { alCambiar, clienteOpcional = fal
       if (c.incrementoPct) partes.push(`+${num(c.incrementoPct, 0)}%`);
       sinPrecio = c.precioTela === 0 || c.precioSistema === 0;
     }
+    if (c.automatizada) partes.push(`motor ${plata(c.costoMotor / c.cantidad)} <span class="mini">(al costo)</span>`);
     if (item.instalacion) partes.push(`instalación ${plata(c.costoInstalador / c.cantidad)} <span class="mini">(incluida en el precio)</span>`);
 
     // Con el bloque plegado igual se ve cómo va armada la cortina.

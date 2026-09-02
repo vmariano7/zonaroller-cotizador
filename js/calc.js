@@ -89,6 +89,10 @@ export function configVacia() {
     // Lo que te sale el instalador. Se traslada al precio final de la cortina:
     // al cliente no se le cobra aparte, ya viene adentro. Ver costoInstaladorItem.
     instalador: { roller: 15000, vertical: 20000, recargoPct: 50 },
+    // Lo que te sale el motor de una roller automatizada. Va a precio de costo,
+    // sin incremento: se suma después de la ganancia, igual que la instalación.
+    // El importe real se carga en Ajustes, no vive en el código.
+    costoMotor: 0,
     // Precio de contado y el mensaje que se le manda al cliente. Ver mensaje.js.
     contado: { descuentoPct: 35, plazoDias: 5, plantilla: '' },
     // Punto de partida de la caja: lo que hay en el local y en el banco en el
@@ -147,6 +151,7 @@ export function itemVacio(tipo = 'roller') {
     cantidad: 1,
     sistemaKey: null, // null = automático según tipo y tela
     instalacion: true,
+    ...(admiteMotor(tipo) ? { automatizada: false } : {}),
     // Armado: arranca vacío, se elige cortina por cortina. Al agregar otra
     // cortina el editor copia lo que hayas puesto en la anterior.
     ...Object.fromEntries((ARMADO_POR_TIPO[tipo] || []).map((k) => [k, ''])),
@@ -163,9 +168,13 @@ export function detallesTecnicos(item) {
     const paños = Number(item.cantPaños) || 1;
     return [`${paños} paño${paños === 1 ? '' : 's'}`, item.pliegue, item.recogimiento].filter(Boolean);
   }
-  return (ARMADO_POR_TIPO[item.tipo] || [])
-    .map((campo) => (item[campo] ? `${ARMADO[campo].prefijo} ${item[campo]}` : null))
-    .filter(Boolean);
+  // Que vaya primero: el taller arma distinto una roller motorizada.
+  const motor = admiteMotor(item.tipo) && item.automatizada ? ['Automatizada (motor)'] : [];
+  return motor.concat(
+    (ARMADO_POR_TIPO[item.tipo] || [])
+      .map((campo) => (item[campo] ? `${ARMADO[campo].prefijo} ${item[campo]}` : null))
+      .filter(Boolean)
+  );
 }
 
 /**
@@ -202,6 +211,22 @@ const ladoCobrado = (metros) => Math.max(MINIMO_LADO_M, Number(metros) || 0);
 
 /** Tipos que llevan la tarifa de instalación más cara. */
 const INSTALACION_CARA = ['vertical', 'tela_tradicional'];
+
+/** Solo las roller se automatizan. */
+export function admiteMotor(tipo) {
+  return tipo === 'roller';
+}
+
+/**
+ * Lo que te sale el motor de esta cortina, o 0 si no lleva.
+ * Se traslada tal cual al precio, sin incremento: es un costo que se recupera,
+ * no algo sobre lo que se gana. Por eso se suma después de la ganancia, en el
+ * mismo lugar que la instalación.
+ */
+export function costoMotorItem(item, config) {
+  if (!admiteMotor(item?.tipo) || !item?.automatizada) return 0;
+  return Number(config?.costoMotor) || 0;
+}
 
 /** Ancho de la cortina en metros, venga en metros o en centímetros. */
 export function anchoEnMetros(item) {
@@ -296,9 +321,13 @@ export function calcularItem(item, config, contexto = {}) {
     ? Number(item.costoInstaladorFijado)
     : costoInstaladorItem(item, config, contexto);
 
+  // El motor va a precio de costo, sin ganancia, así que entra acá abajo y no
+  // arriba con la tela y el sistema.
+  const costoMotorUnit = costoMotorItem(item, config);
+
   // Lo que necesitás cobrar: eso es el contado. El precio de lista lo aguanta
   // con el descuento puesto encima.
-  const contadoUnit = conIncremento + costoInstaladorUnit;
+  const contadoUnit = conIncremento + costoInstaladorUnit + costoMotorUnit;
 
   const fijado = item.precioFijado != null && Number.isFinite(Number(item.precioFijado));
   const precioUnitario = fijado
@@ -306,8 +335,8 @@ export function calcularItem(item, config, contexto = {}) {
     : redondear(contadoUnit * factorLista(config), config.redondeo);
 
   const costoPropio = item.costoFijado != null && Number.isFinite(Number(item.costoFijado))
-    ? (Number(item.costoFijado) + costoInstaladorUnit) * cantidad
-    : (base + costoInstaladorUnit) * cantidad;
+    ? (Number(item.costoFijado) + costoInstaladorUnit + costoMotorUnit) * cantidad
+    : (base + costoInstaladorUnit + costoMotorUnit) * cantidad;
 
   return {
     fijado,
@@ -330,6 +359,8 @@ export function calcularItem(item, config, contexto = {}) {
     precioUnitario,
     total: precioUnitario * cantidad,
     costoInstalador: costoInstaladorUnit * cantidad,
+    automatizada: !!costoMotorUnit,
+    costoMotor: costoMotorUnit * cantidad,
     // Costo propio (sin incremento) para saber el margen real.
     costoPropio,
   };
@@ -392,6 +423,10 @@ function calcularItemTelaTradicional(item, config, contexto = {}) {
     precioUnitario,
     total: precioUnitario * cantidad,
     costoInstalador: costoInstaladorUnit * cantidad,
+    // La tela tradicional no se automatiza: van para que el desglose tenga
+    // siempre la misma forma, venga del tipo que venga.
+    automatizada: false,
+    costoMotor: 0,
     costoPropio,
   };
 }

@@ -86,6 +86,21 @@ export function render(contenedor) {
           traslada al precio final de cada cortina, así que al cliente la instalación no se
           le cobra aparte: ya viene adentro.</div>
         </div>
+
+        <div style="border-top:2px solid var(--linea-fuerte);margin:1rem 0 .8rem"></div>
+
+        <h3 style="margin-bottom:.5rem">Cortinas automáticas <span class="mini" style="font-weight:400">(solo roller)</span></h3>
+        <div class="campo" style="display:flex;align-items:center;gap:.6rem">
+          <label style="flex:1;margin:0;font-weight:500;color:var(--acento)">Costo del motor</label>
+          <div class="con-prefijo" style="width:140px"><span>$</span>
+            <input type="number" inputmode="decimal" min="0" step="1" data-num="costoMotor" value="${c.costoMotor ?? 0}">
+          </div>
+        </div>
+        <div class="banner banner--info" style="margin-top:.8rem">
+          <div>Lo que te sale el motor. Se suma al precio <strong>tal cual, sin ganancia</strong>,
+          igual que la instalación: en una venta de contado lo recuperás exacto. Se activa
+          cortina por cortina, con el tilde <em>Automatizada</em> en Opciones avanzadas.</div>
+        </div>
       </div>
 
       <div>
