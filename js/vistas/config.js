@@ -52,18 +52,38 @@ export function render(contenedor) {
       <div class="tarjeta">
         <div class="tarjeta__cab">
           <span class="seccion-num">02</span>
-          <div><h2>Placas</h2><div class="mini">Productos para la calculadora de Placas del cotizador.</div></div>
+          <div><h2>Placas</h2><div class="mini">Precio de contado por m² de cada producto, colocación y envío.</div></div>
         </div>
         ${(c.placas || []).length ? `
           <div class="lista">
             ${(c.placas || []).map((p) => `
               <div class="campo" style="display:flex;align-items:center;gap:.6rem">
                 <span style="flex:1;font-weight:500">${esc(p.nombre)}</span>
-                <strong>${plata(p.precio)}</strong>
+                <strong>${plata(p.precio)}/m²</strong>
               </div>`).join('')}
           </div>
         ` : '<div class="mini">Todavía no cargaste ninguna placa.</div>'}
         <button class="btn btn--chico mt-16" data-gestionar-productos="placas" style="width:100%">Agregar / editar / borrar</button>
+
+        <div style="border-top:2px solid var(--linea-fuerte);margin:1rem 0 .8rem"></div>
+
+        <div class="campo" style="display:flex;align-items:center;gap:.6rem">
+          <label style="flex:1;margin:0;font-weight:500;color:var(--acento)">Colocación (por m²)</label>
+          <div class="con-prefijo" style="width:130px"><span>$</span>
+            <input type="number" inputmode="decimal" min="0" step="1" data-num="placaColocacionM2" value="${c.placaColocacionM2 ?? 0}">
+          </div>
+        </div>
+        <div class="campo" style="display:flex;align-items:center;gap:.6rem">
+          <label style="flex:1;margin:0;font-weight:500;color:var(--acento)">Envío (fijo)</label>
+          <div class="con-prefijo" style="width:130px"><span>$</span>
+            <input type="number" inputmode="decimal" min="0" step="1" data-num="placaEnvioFijo" value="${c.placaEnvioFijo ?? 0}">
+          </div>
+        </div>
+        <div class="banner banner--info" style="margin-top:.8rem">
+          <div>El precio de cada placa, la colocación y el envío son costos de <strong>contado</strong>:
+          al armar el presupuesto se les aplica el mismo descuento de contado/lista que a las cortinas
+          (ver "Precio de contado y mensaje" más abajo).</div>
+        </div>
       </div>
 
       <div class="tarjeta">
@@ -666,13 +686,16 @@ function dialogoSistemas(alGuardar) {
  * por la cantidad que se cargue.
  */
 function dialogoProductos(categoria, alGuardar) {
-  const titulo = categoria === 'placas' ? 'Placas' : 'Adicionales';
+  const esPlacas = categoria === 'placas';
+  const titulo = esPlacas ? 'Placas' : 'Adicionales';
+  const sufijoPrecio = esPlacas ? '/m²' : '';
   let lista = (estado.config[categoria] || []).map((p) => ({ ...p }));
   if (!lista.length) lista.push({ id: crypto.randomUUID(), nombre: '', precio: 0 });
 
   const m = modal(`Productos: ${titulo}`, `
-    <div class="mini mb-16">Estos son los productos que vas a poder elegir en la calculadora de
-    ${titulo.toLowerCase()} del cotizador. El total sale de multiplicar el precio por la cantidad.</div>
+    <div class="mini mb-16">${esPlacas
+      ? 'Precio de contado por m² de cada placa. En el cotizador se multiplica por la superficie (ancho × alto) y se le aplica el descuento de contado/lista.'
+      : `Estos son los productos que vas a poder elegir en la calculadora de ${titulo.toLowerCase()} del cotizador. El total sale de multiplicar el precio por la cantidad.`}</div>
     <div data-filas></div>
     <button class="btn btn--chico mt-16" data-agregar style="width:100%">+ Agregar producto</button>
     <div class="fila-botones fila-botones--fin mt-16">
@@ -689,6 +712,7 @@ function dialogoProductos(categoria, alGuardar) {
         <div class="con-prefijo" style="width:150px"><span>$</span>
           <input type="number" inputmode="decimal" min="0" step="1" data-precio="${i}" value="${Number(p.precio) || 0}">
         </div>
+        ${sufijoPrecio ? `<span class="mini">${esc(sufijoPrecio)}</span>` : ''}
         <button class="btn-icono" data-quitar="${i}" title="Quitar">&#10005;</button>
       </div>`).join('');
 

@@ -8,11 +8,11 @@ import { el, esc, plata, num, leerNumero, hoyISO, aviso } from '../ui.js';
 import { armarMensaje, datosContado, copiar } from '../mensaje.js';
 import { sugerencias } from './clientes.js';
 
-export function docVacio() {
+export function docVacio(tipo) {
   return {
     fecha: hoyISO(),
     cliente: { nombre: '', telefono: '', email: '', direccion: '', ciudad: 'Mendoza', notas: '' },
-    items: [itemVacio()],
+    items: [itemVacio(tipo)],
     descuentoPct: 0,
     notas: '',
   };
@@ -95,14 +95,18 @@ const ICONOS = {
  * Monta el editor dentro de `contenedor`.
  * Devuelve { leer(), totales(), enfocarCliente() }.
  */
-export function montarEditor(contenedor, doc, { alCambiar, clienteOpcional = false } = {}) {
+export function montarEditor(contenedor, doc, {
+  alCambiar, clienteOpcional = false, tipoInicial = 'roller',
+  tituloSeccion = 'Cortinas', etiquetaAgregar = '+ Agregar otra cortina',
+} = {}) {
   // Durante el armado inicial no avisamos hacia afuera: quien nos llama todavía
   // no terminó de construir su propio estado.
   let montado = false;
   const avisar = () => { if (montado) alCambiar?.(modelo); };
+  const esPlacas = tipoInicial === 'placa';
 
   const modelo = JSON.parse(JSON.stringify(doc));
-  if (!modelo.items?.length) modelo.items = [itemVacio()];
+  if (!modelo.items?.length) modelo.items = [itemVacio(tipoInicial)];
   modelo.items.forEach((it) => {
     if (!it.id) it.id = crypto.randomUUID();
   });
@@ -138,10 +142,10 @@ export function montarEditor(contenedor, doc, { alCambiar, clienteOpcional = fal
 
     <div class="tarjeta">
       <div class="tarjeta__cab">
-        <span class="seccion-num">1</span><h2>Cortinas</h2>
+        <span class="seccion-num">1</span><h2>${esc(tituloSeccion)}</h2>
       </div>
       <div data-items></div>
-      <button class="btn btn--chico" data-agregar style="width:100%">+ Agregar otra cortina</button>
+      <button class="btn btn--chico" data-agregar style="width:100%">${esc(etiquetaAgregar)}</button>
     </div>
 
     <div class="tarjeta">
@@ -268,8 +272,15 @@ export function montarEditor(contenedor, doc, { alCambiar, clienteOpcional = fal
   contenedor.querySelectorAll('[data-agregar]').forEach((b) =>
     b.addEventListener('click', () => {
       const ultimo = modelo.items[modelo.items.length - 1];
-      const nuevo = itemVacio(ultimo?.tipo || 'roller');
-      if (ultimo) {
+      const nuevo = itemVacio(ultimo?.tipo || tipoInicial);
+      if (ultimo && nuevo.tipo === 'placa') {
+        // Lo más común es seguir cargando el mismo producto y las mismas
+        // opciones (colocación/envío) que el renglón anterior.
+        nuevo.productoId = ultimo.productoId;
+        nuevo.producto = ultimo.producto;
+        nuevo.colocacion = ultimo.colocacion;
+        nuevo.envio = ultimo.envio;
+      } else if (ultimo) {
         nuevo.tela = ultimo.tela;
         // El armado se repite entre cortinas de la misma casa casi siempre.
         (ARMADO_POR_TIPO[nuevo.tipo] || []).forEach((k) => { if (ultimo[k]) nuevo[k] = ultimo[k]; });
@@ -290,6 +301,8 @@ export function montarEditor(contenedor, doc, { alCambiar, clienteOpcional = fal
   }
 
   function nodoItem(item, indice) {
+    if (item.tipo === 'placa') return nodoItemPlaca(item, indice);
+
     const config = estado.config;
     const esTelaTradicional = item.tipo === 'tela_tradicional';
     const telas = esTelaTradicional ? (TIPOS.tela_tradicional.telas || []) : telasDeTipo(item.tipo, config);
@@ -536,6 +549,134 @@ export function montarEditor(contenedor, doc, { alCambiar, clienteOpcional = fal
     `;
   }
 
+  /**
+   * Placa: producto del catálogo (Ajustes) + medidas en metros + cantidad,
+   * con colocación y envío opcionales. Nada de tipo/tela/sistema/armado: eso
+   * es exclusivo de las cortinas y no aplica acá.
+   */
+  function nodoItemPlaca(item, indice) {
+    const config = estado.config;
+    const catalogo = config.placas || [];
+    if (!catalogo.some((p) => p.id === item.productoId)) {
+      const primero = catalogo[0];
+      item.productoId = primero?.id ?? null;
+      item.producto = primero?.nombre ?? '';
+    }
+
+    const nodo = el(`
+      <div class="cortina" data-id="${item.id}">
+        <div class="cortina__cab">
+          <span class="cortina__n">${String(indice + 1).padStart(2, '0')}</span>
+          <input data-campo="ambiente" class="cortina__ambiente" placeholder="Ambiente (ej. Living, Dormitorio)" value="${esc(item.ambiente)}">
+          <button class="btn-icono" data-quitar title="Quitar placa">&#10005;</button>
+        </div>
+
+        <div class="campos campos--4 mt-16">
+          <div>
+            <label>Producto</label>
+            <select data-campo="productoId">
+              ${catalogo.map((p) => `<option value="${esc(p.id)}"${p.id === item.productoId ? ' selected' : ''}>${esc(p.nombre)} — ${plata(p.precio)}/m²</option>`).join('')}
+            </select>
+          </div>
+          <div>
+            <label>Ancho</label>
+            <div class="con-sufijo"><input data-medida="anchoM" type="text" inputmode="decimal" placeholder="0" value="${mostrarMedida(item.anchoM)}"><span>m</span></div>
+          </div>
+          <div>
+            <label>Alto</label>
+            <div class="con-sufijo"><input data-medida="altoM" type="text" inputmode="decimal" placeholder="0" value="${mostrarMedida(item.altoM)}"><span>m</span></div>
+          </div>
+          <div>
+            <label>Cantidad</label>
+            <input data-campo="cantidad" type="number" inputmode="numeric" min="1" step="1" value="${item.cantidad || 1}">
+          </div>
+        </div>
+
+        <details class="avanzadas mt-16">
+          <summary>Opciones avanzadas <span class="mini" data-armado></span></summary>
+          <div class="campo mt-16">
+            <label>Detalle</label>
+            <input data-campo="detalle" placeholder="Cualquier otra aclaración…" value="${esc(item.detalle || '')}">
+          </div>
+          <div class="check mt-16">
+            <label class="switch">
+              <input type="checkbox" data-campo="colocacion"${item.colocacion ? ' checked' : ''}>
+              <span class="switch__pista"></span>
+            </label>
+            <span>Con colocación <span class="mini">(${plata(Number(config.placaColocacionM2) || 0)}/m², a costo de contado)</span></span>
+          </div>
+          <div class="check mt-16">
+            <label class="switch">
+              <input type="checkbox" data-campo="envio"${item.envio ? ' checked' : ''}>
+              <span class="switch__pista"></span>
+            </label>
+            <span>Con envío <span class="mini">(${plata(Number(config.placaEnvioFijo) || 0)} fijo, a costo de contado)</span></span>
+          </div>
+        </details>
+
+        <div class="cortina__resumen" data-resumen></div>
+      </div>
+    `);
+
+    nodo.querySelector('[data-quitar]').addEventListener('click', () => {
+      if (modelo.items.length === 1) modelo.items = [itemVacio('placa')];
+      else modelo.items = modelo.items.filter((x) => x.id !== item.id);
+      pintarItems();
+    });
+
+    nodo.querySelector('[data-campo="productoId"]').addEventListener('change', (e) => {
+      item.productoId = e.target.value;
+      item.producto = catalogo.find((p) => p.id === item.productoId)?.nombre || '';
+      pintarResumenPlaca(nodo, item);
+      pintarTotales();
+      avisar();
+    });
+
+    nodo.querySelectorAll('[data-campo]').forEach((inp) => {
+      const campo = inp.dataset.campo;
+      if (campo === 'productoId') return; // ya tiene su propio listener arriba
+      const evento = inp.tagName === 'SELECT' || inp.type === 'checkbox' ? 'change' : 'input';
+      inp.addEventListener(evento, () => {
+        if (inp.type === 'checkbox') item[campo] = inp.checked;
+        else if (inp.type === 'number') item[campo] = inp.value === '' ? null : Number(inp.value);
+        else item[campo] = inp.value;
+        pintarResumenPlaca(nodo, item);
+        pintarTotales();
+        avisar();
+      });
+    });
+
+    nodo.querySelectorAll('[data-medida]').forEach((inp) => {
+      const campo = inp.dataset.medida;
+      inp.addEventListener('input', () => {
+        item[campo] = leerMedida(inp.value);
+        pintarResumenPlaca(nodo, item);
+        pintarTotales();
+        avisar();
+      });
+    });
+
+    pintarResumenPlaca(nodo, item);
+    return nodo;
+  }
+
+  function pintarResumenPlaca(nodo, item) {
+    const c = calcularItem(item, estado.config, {});
+    const partes = [`${num(c.m2)} m²`];
+    if (item.colocacion) partes.push(`colocación ${plata(c.costoColocacion / c.cantidad)} <span class="mini">(al costo)</span>`);
+    if (item.envio) partes.push(`envío ${plata(c.costoEnvio / c.cantidad)} <span class="mini">(al costo)</span>`);
+    const sinPrecio = !item.productoId || c.precioTela === 0;
+
+    const armado = nodo.querySelector('[data-armado]');
+    if (armado) armado.textContent = detallesTecnicos(item).join(' · ');
+
+    nodo.querySelector('[data-resumen]').innerHTML = `
+      <span>${partes.join(' · ')}</span>
+      <span class="cortina__precio">${plata(c.total)}${c.cantidad > 1 ? ` <span class="mini">(${c.cantidad} × ${plata(c.precioUnitario)})</span>` : ''}</span>
+      ${sinPrecio ? '<div class="mini" style="color:var(--rojo);width:100%">Elegí un producto con precio cargado en Configuración.</div>' : ''}
+    `;
+  }
+
   function pintarTotales() {
     const t = calcularTotales(modelo.items, estado.config, { descuentoPct: modelo.descuentoPct });
     pintarMensaje(t);
@@ -590,7 +731,13 @@ export function montarEditor(contenedor, doc, { alCambiar, clienteOpcional = fal
   pintarItems();
   pintarResumenCliente();
 
-  if (!hayPreciosCargados(estado.config)) {
+  if (esPlacas) {
+    if (!(estado.config.placas || []).length) {
+      contenedor.prepend(
+        el('<div class="banner banner--aviso"><div>Todavía no cargaste productos de placas. Andá a <strong>Ajustes</strong> para cargarlos.</div></div>')
+      );
+    }
+  } else if (!hayPreciosCargados(estado.config)) {
     contenedor.prepend(
       el('<div class="banner banner--aviso"><div>Todavía no cargaste tus costos, así que todo va a dar $0. Andá a <strong>Ajustes</strong> para cargarlos.</div></div>')
     );

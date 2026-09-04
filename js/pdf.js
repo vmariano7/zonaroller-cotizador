@@ -7,7 +7,7 @@ import { calcularTotales, descripcionItem, detallesTecnicos } from './calc.js';
 import { plata, num, fecha, esc, sumarDias, ajuste } from './ui.js';
 import { datosContado } from './mensaje.js';
 
-const NOMBRE_TIPO = { roller: 'Roller', vertical: 'Bandas verticales', zebra: 'Zebra', tela_tradicional: 'Cortina Tela Tradicional' };
+const NOMBRE_TIPO = { roller: 'Roller', vertical: 'Bandas verticales', zebra: 'Zebra', tela_tradicional: 'Cortina Tela Tradicional', placa: 'Placa' };
 
 export function montarHoja(html, tituloVentana, claseExtra = '') {
   document.querySelectorAll('.hoja').forEach((n) => n.remove());
@@ -97,7 +97,7 @@ export function imprimirPresupuesto(p) {
         ${t.lineas.map(({ item, calc }) => `
           <tr>
             <td>${esc(item.ambiente || '—')}</td>
-            <td>${esc(descripcionItem(item) || `${NOMBRE_TIPO[item.tipo] || item.tipo} · ${item.tela}`)}${calc.automatizada ? '<br><span style="font-size:8pt">Automatizada, con motor</span>' : ''}${item.detalle ? `<br><span style="font-size:8pt">${esc(item.detalle)}</span>` : ''}${item.instalacion ? '<br><span style="font-size:8pt">Instalación sin cargo</span>' : ''}</td>
+            <td>${esc(descripcionItem(item) || `${NOMBRE_TIPO[item.tipo] || item.tipo} · ${item.tela}`)}${calc.automatizada ? '<br><span style="font-size:8pt">Automatizada, con motor</span>' : ''}${item.tipo === 'placa' ? detallesTecnicos(item).map((d) => `<br><span style="font-size:8pt">${esc(d)}</span>`).join('') : ''}${item.detalle ? `<br><span style="font-size:8pt">${esc(item.detalle)}</span>` : ''}${item.instalacion ? '<br><span style="font-size:8pt">Instalación sin cargo</span>' : ''}</td>
             <td class="num">${num(calc.anchoM)} × ${num(calc.altoM)} m</td>
             <td class="num">${calc.cantidad}</td>
             <td class="num">${plata(calc.precioUnitario)}</td>
@@ -168,15 +168,16 @@ export function imprimirOrdenTrabajo(p) {
       </thead>
       <tbody>
         ${t.lineas.map(({ item, calc }) => {
-          const esTelaTradicional = item.tipo === 'tela_tradicional';
-          const ancho = esTelaTradicional ? `${num(item.anchoM)} m` : `${num(item.anchoCm, 0)} cm`;
-          const alto = esTelaTradicional ? `${num(item.altoM)} m` : `${num(item.altoCm, 0)} cm`;
+          const enMetros = item.tipo === 'tela_tradicional' || item.tipo === 'placa';
+          const ancho = enMetros ? `${num(item.anchoM)} m` : `${num(item.anchoCm, 0)} cm`;
+          const alto = enMetros ? `${num(item.altoM)} m` : `${num(item.altoCm, 0)} cm`;
+          const subtitulo = item.tipo === 'placa' ? item.producto : `${item.tela}${item.tipo === 'tela_tradicional' ? ` ${item.color || ''}` : ''}`;
           // El taller necesita todo el armado: comando, cadena, caída, caño.
           const detalle = [...detallesTecnicos(item), item.detalle].filter(Boolean).join(' · ');
           return `
           <tr>
             <td>${esc(item.ambiente || '—')}</td>
-            <td>${esc(NOMBRE_TIPO[item.tipo] || item.tipo)}<br><span style="font-size:8pt">${esc(item.tela)}${esTelaTradicional ? ` ${esc(item.color || '')}` : ''}</span></td>
+            <td>${esc(NOMBRE_TIPO[item.tipo] || item.tipo)}<br><span style="font-size:8pt">${esc(subtitulo || '')}</span></td>
             <td class="num"><strong>${ancho}</strong></td>
             <td class="num"><strong>${alto}</strong></td>
             <td class="num">${calc.cantidad}</td>

@@ -1,7 +1,7 @@
 // Listado y detalle de presupuestos.
 
 import { estado, guardar, borrar, obtener, proximoNumero } from '../store.js';
-import { calcularTotales, descripcionItem } from '../calc.js';
+import { calcularTotales, descripcionItem, detallesTecnicos } from '../calc.js';
 import { plata, num, fecha, esc, aviso, confirmar, chip, vacio, ajuste, ESTADOS_PRESUPUESTO, sumarDias } from '../ui.js';
 import { navegar } from '../router.js';
 import { imprimirPresupuesto } from '../pdf.js';
@@ -49,16 +49,17 @@ export function render(contenedor) {
     }
 
     lista.innerHTML = items
-      .map(
-        (p) => `
+      .map((p) => {
+        const unidad = p.items?.some((it) => it.tipo === 'placa') ? 'placa' : 'cortina';
+        return `
       <div class="item-lista" data-id="${p.id}">
         <div class="item-lista__cuerpo">
           <div class="item-lista__titulo">${esc(p.cliente?.nombre || 'Sin nombre')} ${chip(ESTADOS_PRESUPUESTO, p.estado)}</div>
-          <div class="mini">${esc(p.numero)} · ${fecha(p.fecha)} · ${p.cantidadCortinas || 0} cortina${p.cantidadCortinas === 1 ? '' : 's'}${p.cliente?.direccion ? ` · ${esc(p.cliente.direccion)}` : ''}</div>
+          <div class="mini">${esc(p.numero)} · ${fecha(p.fecha)} · ${p.cantidadCortinas || 0} ${unidad}${p.cantidadCortinas === 1 ? '' : 's'}${p.cliente?.direccion ? ` · ${esc(p.cliente.direccion)}` : ''}</div>
         </div>
         <div class="item-lista__monto">${plata(p.total)}</div>
-      </div>`
-      )
+      </div>`;
+      })
       .join('');
 
     lista.querySelectorAll('[data-id]').forEach((n) =>
@@ -163,7 +164,7 @@ export function renderDetalle(contenedor, params) {
             ${t.lineas.map(({ item, calc }) => `
               <tr>
                 <td>${esc(item.ambiente || '—')}${item.detalle ? `<div class="mini">${esc(item.detalle)}</div>` : ''}</td>
-                <td>${esc({ roller: 'Roller', vertical: 'Bandas verticales', zebra: 'Zebra', tela_tradicional: 'Cortina Tela Tradicional' }[item.tipo] || item.tipo)}<div class="mini">${esc(descripcionItem(item) || item.tela)}</div></td>
+                <td>${esc({ roller: 'Roller', vertical: 'Bandas verticales', zebra: 'Zebra', tela_tradicional: 'Cortina Tela Tradicional', placa: 'Placa' }[item.tipo] || item.tipo)}<div class="mini">${esc(descripcionItem(item) || item.tela)}</div></td>
                 <td class="num">${num(calc.anchoM)} × ${num(calc.altoM)} m</td>
                 <td class="num">${num(calc.m2)}</td>
                 <td class="num">${calc.cantidad}</td>
@@ -214,9 +215,11 @@ export function renderDetalle(contenedor, params) {
   contenedor.querySelector('[data-whatsapp]')?.addEventListener('click', () => {
     const tel = String(p.cliente.telefono).replace(/\D/g, '');
     const emp = estado.config.empresa || {};
-    const lineas = t.lineas.map(({ item, calc }) =>
-      `• ${item.ambiente || 'Cortina'} — ${item.tela}, ${num(calc.anchoM)} × ${num(calc.altoM)} m${calc.cantidad > 1 ? ` (x${calc.cantidad})` : ''}: ${plata(calc.total)}`
-    );
+    const lineas = t.lineas.map(({ item, calc }) => {
+      const nombre = item.tipo === 'placa' ? (item.producto || 'Placa') : item.tela;
+      const detalle = detallesTecnicos(item).join(', ');
+      return `• ${item.ambiente || 'Cortina'} — ${nombre}, ${num(calc.anchoM)} × ${num(calc.altoM)} m${detalle ? ` (${detalle})` : ''}${calc.cantidad > 1 ? ` (x${calc.cantidad})` : ''}: ${plata(calc.total)}`;
+    });
     const texto = [
       `Hola ${p.cliente.nombre}, te paso el presupuesto de ${emp.nombre || 'Zona Roller'} (${p.numero}):`,
       '',

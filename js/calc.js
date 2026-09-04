@@ -117,6 +117,11 @@ export function configVacia() {
     // sólo multiplica precio × cantidad, sin fórmula ni incremento.
     placas: [],
     adicionales: [],
+    // Colocación y envío de placas: van al costo de contado igual que el
+    // precio del producto (ver calcularItemPlaca), así que al pasarlo a lista
+    // se les aplica el mismo descuento que a todo lo demás.
+    placaColocacionM2: 0,
+    placaEnvioFijo: 0,
     incrementos: {
       roller: { activo: true, valor: 0 },
       vertical: { activo: true, valor: 0 },
@@ -160,6 +165,21 @@ export function configVacia() {
 }
 
 export function itemVacio(tipo = 'roller') {
+  if (tipo === 'placa') {
+    return {
+      id: crypto.randomUUID(),
+      ambiente: '',
+      tipo,
+      productoId: null,
+      producto: '', // nombre copiado al elegir el producto: si lo borrás o renombrás después, el renglón viejo lo sigue mostrando igual
+      anchoM: null,
+      altoM: null,
+      cantidad: 1,
+      colocacion: false,
+      envio: false,
+      detalle: '',
+    };
+  }
   if (tipo === 'tela_tradicional') {
     const t = TIPOS.tela_tradicional;
     return {
@@ -201,6 +221,9 @@ export function itemVacio(tipo = 'roller') {
  * Sirve tanto para el resumen en pantalla como para la orden de trabajo.
  */
 export function detallesTecnicos(item) {
+  if (item.tipo === 'placa') {
+    return [item.colocacion ? 'Con colocación' : null, item.envio ? 'Con envío' : null].filter(Boolean);
+  }
   if (item.tipo === 'tela_tradicional') {
     const paños = Number(item.cantPaños) || 1;
     return [`${paños} paño${paños === 1 ? '' : 's'}`, item.pliegue, item.recogimiento].filter(Boolean);
@@ -223,6 +246,11 @@ export function detallesTecnicos(item) {
  * guardado: si está, se sigue mostrando tal como salió en su momento.
  */
 export function descripcionItem(item) {
+  if (item.tipo === 'placa') {
+    const ancho = Number(item.anchoM) || 0;
+    const alto = Number(item.altoM) || 0;
+    return [item.producto || 'Placa', `${ancho}x${alto}m`].filter(Boolean).join(' ');
+  }
   if (item.tipo !== 'tela_tradicional') return null;
   const ancho = Number(item.anchoM) || 0;
   const alto = Number(item.altoM) || 0;
@@ -327,6 +355,7 @@ export function factorLista(config) {
  * que se cobró o costó hace meses.
  */
 export function calcularItem(item, config, contexto = {}) {
+  if (item.tipo === 'placa') return calcularItemPlaca(item, config);
   if (item.tipo === 'tela_tradicional') return calcularItemTelaTradicional(item, config, contexto);
 
   const anchoM = (Number(item.anchoCm) || 0) / 100;
@@ -399,6 +428,68 @@ export function calcularItem(item, config, contexto = {}) {
     automatizada: !!costoMotorUnit,
     costoMotor: costoMotorUnit * cantidad,
     // Costo propio (sin incremento) para saber el margen real.
+    costoPropio,
+  };
+}
+
+/**
+ * Placa: precio de contado por m² (cargado en Ajustes) × superficie, más
+ * colocación (por m², opcional) y envío (fijo, opcional) — los tres a precio
+ * de contado. El de lista sale de aplicarle el mismo factor que a las
+ * cortinas (ver factorLista): colocación y envío también se inflan, a
+ * diferencia de la instalación de una cortina, porque acá los tres montos ya
+ * vienen dados como costo de contado.
+ */
+function calcularItemPlaca(item, config) {
+  const producto = (config.placas || []).find((p) => p.id === item.productoId);
+  const anchoM = Number(item.anchoM) || 0;
+  const altoM = Number(item.altoM) || 0;
+  const cantidad = Math.max(1, Number(item.cantidad) || 1);
+  const area = anchoM * altoM;
+
+  const precioM2 = Number(producto?.precio) || 0;
+  const base = area * precioM2;
+  const costoColocacionUnit = item.colocacion ? area * (Number(config.placaColocacionM2) || 0) : 0;
+  const costoEnvioUnit = item.envio ? Number(config.placaEnvioFijo) || 0 : 0;
+  const contadoUnit = base + costoColocacionUnit + costoEnvioUnit;
+
+  const fijado = item.precioFijado != null && Number.isFinite(Number(item.precioFijado));
+  const precioUnitario = fijado
+    ? Number(item.precioFijado)
+    : redondear(contadoUnit * factorLista(config), config.redondeo);
+
+  const costoPropio = item.costoFijado != null && Number.isFinite(Number(item.costoFijado))
+    ? (Number(item.costoFijado) + costoColocacionUnit + costoEnvioUnit) * cantidad
+    : contadoUnit * cantidad;
+
+  return {
+    fijado,
+    m2Real: area,
+    m2: area,
+    aplicaMinimo: false,
+    anchoM,
+    altoM,
+    cantidad,
+    precioTela: precioM2,
+    sistemaKey: null,
+    sistemaNombre: item.producto || producto?.nombre || '',
+    precioSistema: 0,
+    costoTela: base,
+    costoSistema: 0,
+    base,
+    incrementoPct: 0,
+    montoIncremento: 0,
+    conIncremento: base,
+    precioUnitario,
+    total: precioUnitario * cantidad,
+    // Colocación reusa el mismo casillero que la instalación de una cortina:
+    // así Pedidos y Caja la siguen viendo como "lo que hay que pagarle a
+    // alguien" sin que haga falta tocar esas pantallas.
+    costoInstalador: costoColocacionUnit * cantidad,
+    costoColocacion: costoColocacionUnit * cantidad,
+    costoEnvio: costoEnvioUnit * cantidad,
+    automatizada: false,
+    costoMotor: 0,
     costoPropio,
   };
 }

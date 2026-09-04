@@ -268,12 +268,15 @@ export function render(contenedor) {
 export function renderEditor(contenedor, params = {}) {
   const existente = params.id ? obtener('pedidos', params.id) : null;
   const doc = existente ? { ...existente } : docVacio();
+  // Un pedido "desde cero" siempre arranca en cortinas; uno existente puede
+  // venir de un presupuesto de placas, así que lo deducimos de sus renglones.
+  const esPlacas = !!existente?.items?.some((it) => it.tipo === 'placa');
 
   contenedor.innerHTML = `
     <div class="titulo-pagina">
       <div>
         <h1>${existente ? `Editar pedido ${existente.numero}` : 'Nuevo pedido'}</h1>
-        <div class="sub">${existente ? 'Modificá cliente o cortinas' : 'Cargá un pedido confirmado sin pasar por un presupuesto'}</div>
+        <div class="sub">${existente ? `Modificá cliente o ${esPlacas ? 'placas' : 'cortinas'}` : 'Cargá un pedido confirmado sin pasar por un presupuesto'}</div>
       </div>
     </div>
     <div data-editor></div>
@@ -281,12 +284,18 @@ export function renderEditor(contenedor, params = {}) {
   `;
 
   const barra = contenedor.querySelector('.resumen-fijo');
-  const editor = montarEditor(contenedor.querySelector('[data-editor]'), doc, { alCambiar: pintarBarra });
+  const editor = montarEditor(contenedor.querySelector('[data-editor]'), doc, {
+    alCambiar: pintarBarra,
+    tipoInicial: esPlacas ? 'placa' : 'roller',
+    tituloSeccion: esPlacas ? 'Placas' : 'Cortinas',
+    etiquetaAgregar: esPlacas ? '+ Agregar otra placa' : '+ Agregar otra cortina',
+  });
 
   function pintarBarra() {
     const t = editor.totales();
+    const unidad = esPlacas ? 'placa' : 'cortina';
     barra.innerHTML = `
-      <div class="resumen-fijo__fila"><span>${t.cantidadCortinas} cortina${t.cantidadCortinas === 1 ? '' : 's'}</span><span></span></div>
+      <div class="resumen-fijo__fila"><span>${t.cantidadCortinas} ${unidad}${t.cantidadCortinas === 1 ? '' : 's'}</span><span></span></div>
       <div class="resumen-fijo__total"><span>Total</span><span>${plata(t.total)}</span></div>
       <div class="fila-botones mt-16">
         <button class="btn btn--primario" data-guardar style="flex:1">${existente ? 'Guardar cambios' : 'Crear pedido'}</button>
@@ -342,6 +351,8 @@ export function renderDetalle(contenedor, params) {
   const cs = costos(p);
   const gana = margen(p);
   const ganaPct = cobra ? (gana / cobra) * 100 : 0;
+  const esPlacas = p.items?.some((it) => it.tipo === 'placa');
+  const unidad = esPlacas ? 'placa' : 'cortina';
 
   contenedor.innerHTML = `
     <div class="titulo-pagina">
@@ -359,7 +370,7 @@ export function renderDetalle(contenedor, params) {
       <div class="kpi"><div class="kpi__etiqueta">Total</div><div class="kpi__valor">${plata(cobra)}</div><div class="kpi__pie">${v.modo === 'contado' ? 'precio de contado' : 'precio de lista'}${v.redondeo ? ' · redondeado' : ''}</div></div>
       <div class="kpi kpi--verde"><div class="kpi__etiqueta">Cobrado</div><div class="kpi__valor">${plata(pagado)}</div></div>
       <div class="kpi ${debe > 0 ? 'kpi--rojo' : 'kpi--verde'}"><div class="kpi__etiqueta">Saldo</div><div class="kpi__valor">${plata(debe)}</div></div>
-      <div class="kpi"><div class="kpi__etiqueta">Instalación a pagar</div><div class="kpi__valor">${plata(p.instalacionPagada ? 0 : t.costoInstalacion)}</div><div class="kpi__pie">${p.instalacionPagada ? 'ya pagada' : `${t.cantidadCortinas} cortinas`}</div></div>
+      <div class="kpi"><div class="kpi__etiqueta">Instalación a pagar</div><div class="kpi__valor">${plata(p.instalacionPagada ? 0 : t.costoInstalacion)}</div><div class="kpi__pie">${p.instalacionPagada ? 'ya pagada' : `${t.cantidadCortinas} ${unidad}${t.cantidadCortinas === 1 ? '' : 's'}`}</div></div>
     </div>
 
     <div class="tarjeta">
@@ -460,7 +471,7 @@ export function renderDetalle(contenedor, params) {
     </div>
 
     <div class="tarjeta">
-      <div class="tarjeta__cab"><h2>Cortinas</h2></div>
+      <div class="tarjeta__cab"><h2>${esPlacas ? 'Placas' : 'Cortinas'}</h2></div>
       <div class="tabla-scroll">
         <table>
           <thead><tr><th>Ambiente</th><th>Tipo y tela</th><th class="num">Medidas</th><th class="num">Sistema</th><th class="num">Cant.</th><th class="num">Total</th></tr></thead>
@@ -468,7 +479,7 @@ export function renderDetalle(contenedor, params) {
             ${t.lineas.map(({ item, calc }) => `
               <tr>
                 <td>${esc(item.ambiente || '—')}${armado(item) ? `<div class="mini">${esc(armado(item))}</div>` : ''}</td>
-                <td>${esc({ roller: 'Roller', vertical: 'Bandas verticales', zebra: 'Zebra', tela_tradicional: 'Cortina Tela Tradicional' }[item.tipo] || item.tipo)}<div class="mini">${esc(descripcionItem(item) || item.tela)}</div></td>
+                <td>${esc({ roller: 'Roller', vertical: 'Bandas verticales', zebra: 'Zebra', tela_tradicional: 'Cortina Tela Tradicional', placa: 'Placa' }[item.tipo] || item.tipo)}<div class="mini">${esc(descripcionItem(item) || item.tela)}</div></td>
                 <td class="num">${num(calc.anchoM)} × ${num(calc.altoM)} m</td>
                 <td class="num mini">${esc(calc.sistemaNombre)}</td>
                 <td class="num">${calc.cantidad}</td>

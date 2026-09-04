@@ -4,8 +4,10 @@
 // muestra primero un selector de categoría: Cortinas, Placas o Adicionales.
 // Cortinas habilita el editor de siempre, sin ningún cambio: roller, vertical,
 // zebra y tela tradicional siguen viviendo adentro, tal cual estaban.
-// Placas y Adicionales son catálogos de productos simples (ver Ajustes) con
-// su propia calculadora de unidades, en `calculadora.js`.
+// Placas pasa por el mismo editor (mismo guardado, PDF, conversión a pedido),
+// pero con renglones de producto + m² en vez de tipo/tela/sistema — ver
+// nodoItemPlaca en editor.js. Adicionales sigue siendo la calculadora simple
+// de unidades, en `calculadora.js`.
 
 import { montarEditor, docVacio, CLIENTE_POR_DEFECTO } from './editor.js';
 import { render as renderCalculadora } from './calculadora.js';
@@ -24,7 +26,7 @@ const CATEGORIAS = [
   {
     clave: 'placas',
     nombre: 'Placas',
-    desc: 'Calculadora por unidades',
+    desc: 'Presupuesto por producto y m²',
     icono: '<rect x="4" y="4" width="16" height="16" rx="1.5"/><path d="M4 10h16M10 4v16"/>',
   },
   {
@@ -37,10 +39,10 @@ const CATEGORIAS = [
 
 export function render(contenedor, params = {}) {
   if (!params.id && !params.categoria) return renderElegirCategoria(contenedor);
-  if (!params.id && params.categoria !== 'cortinas') {
-    return renderCalculadora(contenedor, { categoria: params.categoria });
+  if (!params.id && params.categoria === 'adicionales') {
+    return renderCalculadora(contenedor, { categoria: 'adicionales' });
   }
-  return renderCortinas(contenedor, params);
+  return renderPresupuesto(contenedor, params);
 }
 
 function renderElegirCategoria(contenedor) {
@@ -59,20 +61,24 @@ function renderElegirCategoria(contenedor) {
   `;
 }
 
-function renderCortinas(contenedor, params) {
+function renderPresupuesto(contenedor, params) {
   const existente = params.id ? obtener('presupuestos', params.id) : null;
   if (params.id && !existente) {
     contenedor.innerHTML = '<div class="vacio"><p>No encontré ese presupuesto.</p></div>';
     return;
   }
 
-  const doc = existente ? { ...existente } : docVacio();
+  // Un presupuesto es de una sola categoría: se elige al crearlo. Al editar
+  // uno ya guardado, la deducimos de sus renglones en vez de pedirla de nuevo.
+  const esPlacas = existente ? existente.items?.some((it) => it.tipo === 'placa') : params.categoria === 'placas';
+
+  const doc = existente ? { ...existente } : docVacio(esPlacas ? 'placa' : 'roller');
 
   contenedor.innerHTML = `
     <div class="titulo-pagina">
       <div>
         <h1>${existente ? `Presupuesto ${existente.numero}` : 'Nuevo presupuesto'}</h1>
-        <div class="sub">${existente ? 'Editando un presupuesto guardado' : 'Cargá las cortinas y mirá el total en vivo. El cliente es opcional.'}</div>
+        <div class="sub">${existente ? 'Editando un presupuesto guardado' : esPlacas ? 'Cargá las placas y mirá el total en vivo. El cliente es opcional.' : 'Cargá las cortinas y mirá el total en vivo. El cliente es opcional.'}</div>
       </div>
     </div>
     <div data-editor></div>
@@ -83,12 +89,16 @@ function renderCortinas(contenedor, params) {
   const editor = montarEditor(contenedor.querySelector('[data-editor]'), doc, {
     alCambiar: () => pintarBarra(),
     clienteOpcional: true,
+    tipoInicial: esPlacas ? 'placa' : 'roller',
+    tituloSeccion: esPlacas ? 'Placas' : 'Cortinas',
+    etiquetaAgregar: esPlacas ? '+ Agregar otra placa' : '+ Agregar otra cortina',
   });
 
   function pintarBarra() {
     const t = editor.totales();
+    const unidad = esPlacas ? 'placa' : 'cortina';
     barra.innerHTML = `
-      <div class="resumen-fijo__fila"><span>${t.cantidadCortinas} cortina${t.cantidadCortinas === 1 ? '' : 's'}</span><span>${t.montoDescuento ? `descuento ${plata(t.montoDescuento)}` : ''}</span></div>
+      <div class="resumen-fijo__fila"><span>${t.cantidadCortinas} ${unidad}${t.cantidadCortinas === 1 ? '' : 's'}</span><span>${t.montoDescuento ? `descuento ${plata(t.montoDescuento)}` : ''}</span></div>
       <div class="resumen-fijo__total"><span>Total</span><span>${plata(t.total)}</span></div>
       <div class="fila-botones mt-16">
         <button class="btn btn--primario" data-guardar style="flex:1">${existente ? 'Guardar cambios' : 'Guardar presupuesto'}</button>
