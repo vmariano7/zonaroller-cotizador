@@ -2,9 +2,9 @@
 // sincronización con la nube y respaldos.
 
 import { estado, guardarConfig, cerrarSesion, sincronizar, exportarRespaldo, importarRespaldo } from '../store.js';
-import { TIPOS, SISTEMAS } from '../calc.js';
+import { TIPOS, SISTEMAS, CATEGORIA } from '../calc.js';
 import { esc, aviso, confirmar, descargarArchivo, fecha, plata, modal } from '../ui.js';
-import { PLANTILLA_POR_DEFECTO, CLAVES } from '../mensaje.js';
+import { plantillaDe, CLAVES } from '../mensaje.js';
 import { tienePin, definirPin } from '../candado.js';
 
 /**
@@ -100,7 +100,7 @@ export function render(contenedor) {
       <div class="tarjeta">
         <div class="tarjeta__cab">
           <span class="seccion-num">03</span>
-          <div><h2>Adicionales</h2><div class="mini">Productos para la calculadora de Adicionales del cotizador.</div></div>
+          <div><h2>Adicionales</h2><div class="mini">Precio de contado por unidad de cada producto.</div></div>
         </div>
         ${(c.adicionales || []).length ? `
           <div class="lista">
@@ -284,14 +284,19 @@ export function render(contenedor) {
         <strong>de contado</strong>, y el de lista se calcula para que al descontarle este
         porcentaje quede justo ahí. Si lo cambiás, <strong>se mueven todos los precios nuevos</strong>.</div>
       </div>
-      <div class="campo mt-16">
-        <label>Texto del mensaje</label>
-        <textarea data-ctd-texto rows="10" style="min-height:200px">${esc(c.contado?.plantilla || PLANTILLA_POR_DEFECTO)}</textarea>
-        <div class="mini mt-16">Lo que va entre llaves se reemplaza solo: ${CLAVES.map(([k, q]) => `<code>${esc(k)}</code> ${esc(q)}`).join(' · ')}</div>
-      </div>
-      <div class="fila-botones">
-        <button class="btn btn--fantasma btn--chico" data-ctd-restaurar>Volver al texto original</button>
-      </div>
+      <div class="mini mt-16" style="font-weight:600">Texto del mensaje</div>
+      <div class="mini" style="margin:.2rem 0 .6rem">Uno por categoría: el que se manda depende de qué tenga el presupuesto.
+      Lo que va entre llaves se reemplaza solo: ${CLAVES.map(([k, q]) => `<code>${esc(k)}</code> ${esc(q)}`).join(' · ')}</div>
+      ${Object.entries(CATEGORIA).map(([clave, def]) => `
+        <details class="avanzadas" style="margin-bottom:.5rem">
+          <summary>${esc(def.titulo)} <span class="mini">${c.contado?.plantillas?.[clave]?.trim() ? '· editado' : '· texto por defecto'}</span></summary>
+          <div class="campo mt-16">
+            <textarea data-ctd-plantilla="${clave}" rows="9" style="min-height:180px">${esc(plantillaDe(clave, c))}</textarea>
+          </div>
+          <div class="fila-botones">
+            <button class="btn btn--fantasma btn--chico" data-ctd-restaurar="${clave}">Volver al texto original</button>
+          </div>
+        </details>`).join('')}
     </div>
 
     <div class="tarjeta">
@@ -456,16 +461,29 @@ export function render(contenedor) {
       guardarPronto({ contado: { ...estado.config.contado, [inp.dataset.ctd]: leerCasillero(inp) } })
     )
   );
-  const textoMensaje = contenedor.querySelector('[data-ctd-texto]');
-  textoMensaje.addEventListener('input', () =>
-    guardarPronto({ contado: { ...estado.config.contado, plantilla: textoMensaje.value } })
+  // Un texto por categoría. El de cortinas se sigue guardando también en
+  // `contado.plantilla` (donde vivía cuando había uno solo) para que una
+  // versión vieja de la app siga mostrando algo con sentido.
+  const guardarPlantilla = (clave, texto) => {
+    const contado = { ...estado.config.contado };
+    contado.plantillas = { ...contado.plantillas, [clave]: texto };
+    if (clave === 'cortina') contado.plantilla = texto;
+    guardarPronto({ contado });
+  };
+
+  contenedor.querySelectorAll('[data-ctd-plantilla]').forEach((ta) =>
+    ta.addEventListener('input', () => guardarPlantilla(ta.dataset.ctdPlantilla, ta.value))
   );
-  contenedor.querySelector('[data-ctd-restaurar]').addEventListener('click', async () => {
-    if (!(await confirmar('¿Volver al texto original? Perdés los cambios que le hayas hecho.', { textoOk: 'Volver al original' }))) return;
-    textoMensaje.value = PLANTILLA_POR_DEFECTO;
-    guardarPronto({ contado: { ...estado.config.contado, plantilla: '' } });
-    aviso('Texto restaurado.');
-  });
+
+  contenedor.querySelectorAll('[data-ctd-restaurar]').forEach((b) =>
+    b.addEventListener('click', async () => {
+      if (!(await confirmar('¿Volver al texto original? Perdés los cambios que le hayas hecho.', { textoOk: 'Volver al original' }))) return;
+      const clave = b.dataset.ctdRestaurar;
+      guardarPlantilla(clave, '');
+      aviso('Texto restaurado.');
+      render(contenedor);
+    })
+  );
 
   /* ---- Sincronización ---- */
   contenedor.querySelector('[data-sb-sinc]').addEventListener('click', async () => {
@@ -694,8 +712,7 @@ function dialogoSistemas(alGuardar) {
 
 /**
  * Agregar, editar o borrar productos de Placas o Adicionales: cada uno es
- * simplemente nombre + precio, que la calculadora del cotizador multiplica
- * por la cantidad que se cargue.
+ * nombre + precio de contado (por m² en placas, por unidad en adicionales).
  */
 function dialogoProductos(categoria, alGuardar) {
   const esPlacas = categoria === 'placas';
@@ -707,7 +724,7 @@ function dialogoProductos(categoria, alGuardar) {
   const m = modal(`Productos: ${titulo}`, `
     <div class="mini mb-16">${esPlacas
       ? 'Precio de contado por m² de cada placa. En el cotizador se multiplica por la superficie (ancho × alto) y se le aplica el descuento de contado/lista.'
-      : `Estos son los productos que vas a poder elegir en la calculadora de ${titulo.toLowerCase()} del cotizador. El total sale de multiplicar el precio por la cantidad.`}</div>
+      : 'Precio de contado por unidad. En el cotizador se multiplica por la cantidad y se le aplica el descuento de contado/lista.'}</div>
     <div data-filas></div>
     <button class="btn btn--chico mt-16" data-agregar style="width:100%">+ Agregar producto</button>
     <div class="fila-botones fila-botones--fin mt-16">

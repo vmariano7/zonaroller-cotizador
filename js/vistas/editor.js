@@ -2,7 +2,7 @@
 // El orden importa: primero las cortinas (que es lo que se cotiza a diario) y
 // los datos del cliente arriba, plegados, para que no tapen lo principal.
 
-import { TIPOS, ARMADO, ARMADO_POR_TIPO, itemVacio, calcularItem, calcularTotales, hayPreciosCargados, descripcionItem, detallesTecnicos, admiteMotor, telasDeTipo, superficiePlaca } from '../calc.js';
+import { TIPOS, ARMADO, ARMADO_POR_TIPO, itemVacio, calcularItem, calcularTotales, hayPreciosCargados, descripcionItem, detallesTecnicos, admiteMotor, telasDeTipo, superficiePlaca, catalogoDe } from '../calc.js';
 import { estado } from '../store.js';
 import { el, esc, plata, num, leerNumero, hoyISO, aviso } from '../ui.js';
 import { armarMensaje, datosContado, copiar } from '../mensaje.js';
@@ -103,7 +103,9 @@ export function montarEditor(contenedor, doc, {
   // no terminó de construir su propio estado.
   let montado = false;
   const avisar = () => { if (montado) alCambiar?.(modelo); };
-  const esPlacas = tipoInicial === 'placa';
+  // Placas y adicionales se arman con un catálogo de productos; las cortinas,
+  // con los costos de telas y sistemas. Cambia el aviso de "faltan precios".
+  const esCatalogo = tipoInicial === 'placa' || tipoInicial === 'adicional';
 
   const modelo = JSON.parse(JSON.stringify(doc));
   if (!modelo.items?.length) modelo.items = [itemVacio(tipoInicial)];
@@ -273,13 +275,15 @@ export function montarEditor(contenedor, doc, {
     b.addEventListener('click', () => {
       const ultimo = modelo.items[modelo.items.length - 1];
       const nuevo = itemVacio(ultimo?.tipo || tipoInicial);
-      if (ultimo && nuevo.tipo === 'placa') {
+      if (ultimo && (nuevo.tipo === 'placa' || nuevo.tipo === 'adicional')) {
         // Lo más común es seguir cargando el mismo producto y las mismas
         // opciones (colocación/envío) que el renglón anterior.
         nuevo.productoId = ultimo.productoId;
         nuevo.producto = ultimo.producto;
-        nuevo.colocacion = ultimo.colocacion;
-        nuevo.envio = ultimo.envio;
+        if (nuevo.tipo === 'placa') {
+          nuevo.colocacion = ultimo.colocacion;
+          nuevo.envio = ultimo.envio;
+        }
       } else if (ultimo) {
         nuevo.tela = ultimo.tela;
         // El armado se repite entre cortinas de la misma casa casi siempre.
@@ -301,7 +305,7 @@ export function montarEditor(contenedor, doc, {
   }
 
   function nodoItem(item, indice) {
-    if (item.tipo === 'placa') return nodoItemPlaca(item, indice);
+    if (item.tipo === 'placa' || item.tipo === 'adicional') return nodoItemProducto(item, indice);
 
     const config = estado.config;
     const esTelaTradicional = item.tipo === 'tela_tradicional';
@@ -550,13 +554,15 @@ export function montarEditor(contenedor, doc, {
   }
 
   /**
-   * Placa: producto del catálogo (Ajustes) + medidas en metros + cantidad,
-   * con colocación y envío opcionales. Nada de tipo/tela/sistema/armado: eso
-   * es exclusivo de las cortinas y no aplica acá.
+   * Placa o adicional: producto del catálogo (Ajustes) y cantidad. La placa
+   * suma superficie en m² y los tildes de colocación y envío; el adicional se
+   * cobra por unidad y no lleva nada de eso. Ninguno de los dos tiene
+   * tipo/tela/sistema/armado: eso es exclusivo de las cortinas.
    */
-  function nodoItemPlaca(item, indice) {
+  function nodoItemProducto(item, indice) {
     const config = estado.config;
-    const catalogo = config.placas || [];
+    const esPlaca = item.tipo === 'placa';
+    const catalogo = catalogoDe(item.tipo, config);
     if (!catalogo.some((p) => p.id === item.productoId)) {
       const primero = catalogo[0];
       item.productoId = primero?.id ?? null;
@@ -564,7 +570,7 @@ export function montarEditor(contenedor, doc, {
     }
     // Antes la placa se cargaba con ancho y alto. Si el renglón viene así, lo
     // pasamos a superficie una sola vez, al abrirlo.
-    if (item.m2 == null && (item.anchoM != null || item.altoM != null)) {
+    if (esPlaca && item.m2 == null && (item.anchoM != null || item.altoM != null)) {
       item.m2 = superficiePlaca(item) || null;
       delete item.anchoM;
       delete item.altoM;
@@ -575,20 +581,21 @@ export function montarEditor(contenedor, doc, {
         <div class="cortina__cab">
           <span class="cortina__n">${String(indice + 1).padStart(2, '0')}</span>
           <input data-campo="ambiente" class="cortina__ambiente" placeholder="Ambiente (ej. Living, Dormitorio)" value="${esc(item.ambiente)}">
-          <button class="btn-icono" data-quitar title="Quitar placa">&#10005;</button>
+          <button class="btn-icono" data-quitar title="Quitar ${esPlaca ? 'placa' : 'adicional'}">&#10005;</button>
         </div>
 
-        <div class="campos campos--3 mt-16">
+        <div class="campos campos--${esPlaca ? '3' : '2'} mt-16">
           <div>
             <label>Producto</label>
             <select data-campo="productoId">
-              ${catalogo.map((p) => `<option value="${esc(p.id)}"${p.id === item.productoId ? ' selected' : ''}>${esc(p.nombre)} — ${plata(p.precio)}/m²</option>`).join('')}
+              ${catalogo.map((p) => `<option value="${esc(p.id)}"${p.id === item.productoId ? ' selected' : ''}>${esc(p.nombre)} — ${plata(p.precio)}${esPlaca ? '/m²' : ' c/u'}</option>`).join('')}
             </select>
           </div>
+          ${esPlaca ? `
           <div>
             <label>Superficie</label>
             <div class="con-sufijo"><input data-medida="m2" type="text" inputmode="decimal" placeholder="0" value="${mostrarMedida(item.m2)}"><span>m²</span></div>
-          </div>
+          </div>` : ''}
           <div>
             <label>Cantidad</label>
             <input data-campo="cantidad" type="number" inputmode="numeric" min="1" step="1" value="${item.cantidad || 1}">
@@ -601,6 +608,7 @@ export function montarEditor(contenedor, doc, {
             <label>Detalle</label>
             <input data-campo="detalle" placeholder="Cualquier otra aclaración…" value="${esc(item.detalle || '')}">
           </div>
+          ${esPlaca ? `
           <div class="check mt-16">
             <label class="switch">
               <input type="checkbox" data-campo="colocacion"${item.colocacion ? ' checked' : ''}>
@@ -614,7 +622,7 @@ export function montarEditor(contenedor, doc, {
               <span class="switch__pista"></span>
             </label>
             <span>Con envío <span class="mini">(${plata(Number(config.placaEnvioFijo) || 0)} fijo, a costo de contado)</span></span>
-          </div>
+          </div>` : ''}
         </details>
 
         <div class="cortina__resumen" data-resumen></div>
@@ -622,7 +630,7 @@ export function montarEditor(contenedor, doc, {
     `);
 
     nodo.querySelector('[data-quitar]').addEventListener('click', () => {
-      if (modelo.items.length === 1) modelo.items = [itemVacio('placa')];
+      if (modelo.items.length === 1) modelo.items = [itemVacio(item.tipo)];
       else modelo.items = modelo.items.filter((x) => x.id !== item.id);
       pintarItems();
     });
@@ -630,7 +638,7 @@ export function montarEditor(contenedor, doc, {
     nodo.querySelector('[data-campo="productoId"]').addEventListener('change', (e) => {
       item.productoId = e.target.value;
       item.producto = catalogo.find((p) => p.id === item.productoId)?.nombre || '';
-      pintarResumenPlaca(nodo, item);
+      pintarResumenProducto(nodo, item);
       pintarTotales();
       avisar();
     });
@@ -643,7 +651,7 @@ export function montarEditor(contenedor, doc, {
         if (inp.type === 'checkbox') item[campo] = inp.checked;
         else if (inp.type === 'number') item[campo] = inp.value === '' ? null : Number(inp.value);
         else item[campo] = inp.value;
-        pintarResumenPlaca(nodo, item);
+        pintarResumenProducto(nodo, item);
         pintarTotales();
         avisar();
       });
@@ -653,19 +661,21 @@ export function montarEditor(contenedor, doc, {
       const campo = inp.dataset.medida;
       inp.addEventListener('input', () => {
         item[campo] = leerMedida(inp.value);
-        pintarResumenPlaca(nodo, item);
+        pintarResumenProducto(nodo, item);
         pintarTotales();
         avisar();
       });
     });
 
-    pintarResumenPlaca(nodo, item);
+    pintarResumenProducto(nodo, item);
     return nodo;
   }
 
-  function pintarResumenPlaca(nodo, item) {
+  function pintarResumenProducto(nodo, item) {
     const c = calcularItem(item, estado.config, {});
-    const partes = [`${num(c.m2)} m²`];
+    const partes = item.tipo === 'placa'
+      ? [`${num(c.m2)} m²`]
+      : [`${c.cantidad} × ${plata(c.precioUnitario)}`];
     if (c.incrementoPct) partes.push(`+${num(c.incrementoPct, 0)}%`);
     if (item.colocacion) partes.push(`colocación ${plata(c.costoColocacion / c.cantidad)} <span class="mini">(al costo)</span>`);
     if (item.envio) partes.push(`envío ${plata(c.costoEnvio / c.cantidad)} <span class="mini">(al costo)</span>`);
@@ -735,10 +745,11 @@ export function montarEditor(contenedor, doc, {
   pintarItems();
   pintarResumenCliente();
 
-  if (esPlacas) {
-    if (!(estado.config.placas || []).length) {
+  if (esCatalogo) {
+    if (!catalogoDe(tipoInicial, estado.config).length) {
+      const que = tipoInicial === 'placa' ? 'placas' : 'adicionales';
       contenedor.prepend(
-        el('<div class="banner banner--aviso"><div>Todavía no cargaste productos de placas. Andá a <strong>Ajustes</strong> para cargarlos.</div></div>')
+        el(`<div class="banner banner--aviso"><div>Todavía no cargaste productos de ${que}. Andá a <strong>Ajustes</strong> para cargarlos.</div></div>`)
       );
     }
   } else if (!hayPreciosCargados(estado.config)) {

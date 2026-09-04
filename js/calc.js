@@ -113,8 +113,9 @@ export function configVacia() {
     // Telas que usan el sistema "básico" (más económico) en roller y vertical.
     telasSistemaBasico: ['Blackout', 'Sunscreen 5%'],
     // Placas y adicionales: catálogos de productos simples (nombre + precio)
-    // que se cargan enteramente desde Ajustes. La "calculadora" de cada uno
-    // sólo multiplica precio × cantidad, sin fórmula ni incremento.
+    // que se cargan enteramente desde Ajustes. El precio es de contado: la
+    // placa va por m² y el adicional por unidad. Ver calcularItemPlaca y
+    // calcularItemAdicional.
     placas: [],
     adicionales: [],
     // Colocación y envío de placas: van al costo de contado igual que el
@@ -147,8 +148,8 @@ export function configVacia() {
     // Numeración de los recibos de pago, para seguir la serie que ya venías
     // haciendo a mano. Ver recibo.js.
     recibos: { puntoVenta: '0001', proximo: 1 },
-    // Lo que pagás todos los meses pase lo que pase: [{ id, concepto, monto }].
-    // No son movimientos, no tocan la caja; arman el objetivo del mes. Ver Caja.
+    // Gastos fijos que se cargaban cuando Caja mostraba el objetivo del mes.
+    // Ese tablero se sacó; los datos quedan guardados por si vuelve.
     gastosFijos: [],
     minimoM2: 1,
     redondeo: 100, // redondea el precio unitario final al múltiplo indicado (0 = sin redondeo)
@@ -167,18 +168,18 @@ export function configVacia() {
 }
 
 export function itemVacio(tipo = 'roller') {
-  if (tipo === 'placa') {
+  if (tipo === 'placa' || tipo === 'adicional') {
     return {
       id: crypto.randomUUID(),
       ambiente: '',
       tipo,
       productoId: null,
       producto: '', // nombre copiado al elegir el producto: si lo borrás o renombrás después, el renglón viejo lo sigue mostrando igual
-      m2: null,
       cantidad: 1,
-      colocacion: false,
-      envio: false,
       detalle: '',
+      // La placa se cotiza por superficie y puede llevar colocación y envío;
+      // el adicional se cobra por unidad y no lleva nada de eso.
+      ...(tipo === 'placa' ? { m2: null, colocacion: false, envio: false } : {}),
     };
   }
   if (tipo === 'tela_tradicional') {
@@ -239,6 +240,36 @@ export function detallesTecnicos(item) {
 }
 
 /**
+ * Un presupuesto o pedido es de una sola categoría: se elige al crearlo.
+ * Devuelve con qué está armado, mirando sus renglones.
+ */
+export function categoriaDoc(doc) {
+  const tipo = (doc?.items || []).find((it) => it?.tipo)?.tipo;
+  return tipo === 'placa' || tipo === 'adicional' ? tipo : 'cortina';
+}
+
+/** Cómo se llama cada categoría en pantalla. La clave sale de categoriaDoc. */
+export const CATEGORIA = {
+  cortina: { tipoItem: 'roller', singular: 'cortina', plural: 'cortinas', conArticulo: 'las cortinas', titulo: 'Cortinas', agregar: '+ Agregar otra cortina' },
+  placa: { tipoItem: 'placa', singular: 'placa', plural: 'placas', conArticulo: 'las placas', titulo: 'Placas', agregar: '+ Agregar otra placa' },
+  adicional: { tipoItem: 'adicional', singular: 'adicional', plural: 'adicionales', conArticulo: 'los adicionales', titulo: 'Adicionales', agregar: '+ Agregar otro adicional' },
+};
+
+/** "1 cortina", "3 placas", "4 adicionales". */
+export function contarItems(cantidad, categoria) {
+  const cat = CATEGORIA[categoria] || CATEGORIA.cortina;
+  const n = Number(cantidad) || 0;
+  return `${n} ${n === 1 ? cat.singular : cat.plural}`;
+}
+
+/** El catálogo de productos de una categoría, tal como se carga en Ajustes. */
+export function catalogoDe(tipo, config) {
+  if (tipo === 'placa') return config?.placas || [];
+  if (tipo === 'adicional') return config?.adicionales || [];
+  return [];
+}
+
+/**
  * Superficie de una placa, en m². Se carga en un solo casillero.
  * Los renglones viejos guardaban ancho y alto por separado: si vienen así,
  * se multiplican, para que un presupuesto de antes siga dando lo mismo.
@@ -257,6 +288,7 @@ export function superficiePlaca(item) {
  * guardado: si está, se sigue mostrando tal como salió en su momento.
  */
 export function descripcionItem(item) {
+  if (item.tipo === 'adicional') return item.producto || 'Adicional';
   if (item.tipo === 'placa') {
     // Con coma, como se escribe acá: este texto sale impreso en el presupuesto.
     const m2 = String(superficiePlaca(item)).replace('.', ',');
@@ -367,6 +399,7 @@ export function factorLista(config) {
  */
 export function calcularItem(item, config, contexto = {}) {
   if (item.tipo === 'placa') return calcularItemPlaca(item, config);
+  if (item.tipo === 'adicional') return calcularItemAdicional(item, config);
   if (item.tipo === 'tela_tradicional') return calcularItemTelaTradicional(item, config, contexto);
 
   const anchoM = (Number(item.anchoCm) || 0) / 100;
@@ -507,6 +540,62 @@ function calcularItemPlaca(item, config) {
     costoInstalador: costoColocacionUnit * cantidad,
     costoColocacion: costoColocacionUnit * cantidad,
     costoEnvio: costoEnvioUnit * cantidad,
+    automatizada: false,
+    costoMotor: 0,
+    costoPropio,
+  };
+}
+
+/**
+ * Adicional: precio de contado por unidad (cargado en Ajustes) × cantidad,
+ * con el porcentaje de ganancia de Ajustes → Incrementos encima. Como en todo
+ * lo demás, el precio de lista sale de inflar el contado con factorLista.
+ */
+function calcularItemAdicional(item, config) {
+  const producto = (config.adicionales || []).find((p) => p.id === item.productoId);
+  const cantidad = Math.max(1, Number(item.cantidad) || 1);
+
+  const precioUnidad = Number(producto?.precio) || 0;
+  const base = precioUnidad;
+
+  const reglaInc = config.incrementos?.adicional || { activo: false, valor: 0 };
+  const incrementoPct = reglaInc.activo ? Number(reglaInc.valor) || 0 : 0;
+  const montoIncremento = base * (incrementoPct / 100);
+  const conIncremento = base + montoIncremento;
+
+  const fijado = item.precioFijado != null && Number.isFinite(Number(item.precioFijado));
+  const precioUnitario = fijado
+    ? Number(item.precioFijado)
+    : redondear(conIncremento * factorLista(config), config.redondeo);
+
+  const costoPropio = item.costoFijado != null && Number.isFinite(Number(item.costoFijado))
+    ? Number(item.costoFijado) * cantidad
+    : base * cantidad;
+
+  return {
+    fijado,
+    // Un adicional se vende por unidad: no tiene medidas ni superficie.
+    m2Real: 0,
+    m2: 0,
+    aplicaMinimo: false,
+    anchoM: 0,
+    altoM: 0,
+    cantidad,
+    precioTela: precioUnidad,
+    sistemaKey: null,
+    sistemaNombre: item.producto || producto?.nombre || '',
+    precioSistema: 0,
+    costoTela: base,
+    costoSistema: 0,
+    base,
+    incrementoPct,
+    montoIncremento,
+    conIncremento,
+    precioUnitario,
+    total: precioUnitario * cantidad,
+    costoInstalador: 0,
+    costoColocacion: 0,
+    costoEnvio: 0,
     automatizada: false,
     costoMotor: 0,
     costoPropio,

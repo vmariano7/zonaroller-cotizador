@@ -2,7 +2,7 @@
 // Estrategia: red primero para el código (así siempre agarrás la última versión),
 // caché como respaldo cuando no hay internet.
 
-const CACHE = 'zona-roller-v20';
+const CACHE = 'zona-roller-v21';
 const ARCHIVOS = [
   './',
   './index.html',
@@ -22,7 +22,6 @@ const ARCHIVOS = [
   './js/graficos.js',
   './js/vistas/editor.js',
   './js/vistas/cotizar.js',
-  './js/vistas/calculadora.js',
   './js/vistas/presupuestos.js',
   './js/vistas/pedidos.js',
   './js/vistas/clientes.js',

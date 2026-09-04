@@ -3,13 +3,46 @@
 // Configuración (para editar la plantilla y ver cómo queda).
 
 import { plata, num } from './ui.js';
+import { categoriaDoc } from './calc.js';
 
-export const PLANTILLA_POR_DEFECTO =
-  `Esta cotización te saldría {lista}, que podes hacer en 3 y 6 pagos sin interés con tarjeta de crédito! Sino de contado tenes un {descuento}% de descuento y te queda en {contado}, que puede ser en efectivo o transferencia. Nuestro plazo de producción es de aprox {plazo} días hábiles, y tenes varios tipos de telas y colores a elegir dentro de ese precio!
+/**
+ * Un texto por categoría: lo que se le dice al cliente de una cortina no es
+ * lo mismo que lo de una placa o un adicional. Cada uno se edita por separado
+ * en Ajustes; estos son los que salen si todavía no los tocaste.
+ */
+export const PLANTILLAS_POR_DEFECTO = {
+  cortina: `Esta cotización te saldría {lista}, que podes hacer en 3 y 6 pagos sin interés con tarjeta de crédito! Sino de contado tenes un {descuento}% de descuento y te queda en {contado}, que puede ser en efectivo o transferencia. Nuestro plazo de producción es de aprox {plazo} días hábiles, y tenes varios tipos de telas y colores a elegir dentro de ese precio!
 En caso que quieras avanzar, vamos a verificar las medidas al domicilio y luego las instalamos nosotros, asi que eso va sin cargo!
 Cualquier duda que tengas no dudes en consultarme!!
 
-¡Esperamos tu mensaje! 😊`;
+¡Esperamos tu mensaje! 😊`,
+
+  placa: `Esta cotización te saldría {lista}, que podes hacer en 3 y 6 pagos sin interés con tarjeta de crédito! Sino de contado tenes un {descuento}% de descuento y te queda en {contado}, que puede ser en efectivo o transferencia. Nuestro plazo de entrega es de aprox {plazo} días hábiles.
+Cualquier duda que tengas no dudes en consultarme!!
+
+¡Esperamos tu mensaje! 😊`,
+
+  adicional: `Esta cotización te saldría {lista}, que podes hacer en 3 y 6 pagos sin interés con tarjeta de crédito! Sino de contado tenes un {descuento}% de descuento y te queda en {contado}, que puede ser en efectivo o transferencia. Nuestro plazo de entrega es de aprox {plazo} días hábiles.
+Cualquier duda que tengas no dudes en consultarme!!
+
+¡Esperamos tu mensaje! 😊`,
+};
+
+/** El de cortinas, que era el único que había antes. */
+export const PLANTILLA_POR_DEFECTO = PLANTILLAS_POR_DEFECTO.cortina;
+
+/**
+ * El texto que corresponde a una categoría. Antes había uno solo, guardado en
+ * `contado.plantilla`: si el de cortinas todavía no se editó por separado, se
+ * sigue usando ese, para no perder el que ya venías escribiendo.
+ */
+export function plantillaDe(categoria, config) {
+  const propia = config?.contado?.plantillas?.[categoria];
+  if (propia?.trim()) return propia;
+  const vieja = categoria === 'cortina' ? config?.contado?.plantilla : '';
+  if (vieja?.trim()) return vieja;
+  return PLANTILLAS_POR_DEFECTO[categoria] || PLANTILLAS_POR_DEFECTO.cortina;
+}
 
 export const CLAVES = [
   ['{lista}', 'precio de lista'],
@@ -47,7 +80,7 @@ const pesos = (n) => plata(n).replace(/\s/g, '');
 
 export function armarMensaje(doc, config, total) {
   const { lista, contado, pct, plazo } = datosContado(doc, config, total);
-  const plantilla = config?.contado?.plantilla?.trim() || PLANTILLA_POR_DEFECTO;
+  const plantilla = plantillaDe(categoriaDoc(doc), config);
   const nombre = String(doc?.cliente?.nombre || '').trim().split(/\s+/)[0] || '';
   return plantilla
     .replaceAll('{lista}', pesos(lista))

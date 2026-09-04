@@ -4,14 +4,14 @@
 // muestra primero un selector de categoría: Cortinas, Placas o Adicionales.
 // Cortinas habilita el editor de siempre, sin ningún cambio: roller, vertical,
 // zebra y tela tradicional siguen viviendo adentro, tal cual estaban.
-// Placas pasa por el mismo editor (mismo guardado, PDF, conversión a pedido),
-// pero con renglones de producto + m² en vez de tipo/tela/sistema — ver
-// nodoItemPlaca en editor.js. Adicionales sigue siendo la calculadora simple
-// de unidades, en `calculadora.js`.
+// Las tres categorías pasan por el mismo editor, así que las tres se guardan,
+// se convierten en pedido y salen en PDF igual. Lo único que cambia es el
+// renglón: placas y adicionales usan producto del catálogo en vez de
+// tipo/tela/sistema — ver nodoItemProducto en editor.js.
 
 import { montarEditor, docVacio, CLIENTE_POR_DEFECTO } from './editor.js';
-import { render as renderCalculadora } from './calculadora.js';
 import { guardar, obtener, proximoNumero } from '../store.js';
+import { CATEGORIA, categoriaDoc, contarItems } from '../calc.js';
 import { plata, aviso, confirmar, esc } from '../ui.js';
 import { navegar } from '../router.js';
 import { crearPedidoDesdePresupuesto } from './pedidos.js';
@@ -40,18 +40,18 @@ const CATEGORIAS = [
   {
     clave: 'adicionales',
     nombre: 'Adicionales',
-    desc: 'Calculadora por unidades',
+    desc: 'Productos sueltos, por unidad',
     icono: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round">
       <path d="M3.6 12.6 12 4.2h7.8V12l-8.4 8.4a2 2 0 0 1-2.8 0l-5-5a2 2 0 0 1 0-2.8Z"/>
       <circle cx="15.9" cy="8.1" r="1.3"/></svg>`,
   },
 ];
 
+/** De la categoría que viene en la URL a la clave que usa el resto de la app. */
+const CLAVE_CATEGORIA = { cortinas: 'cortina', placas: 'placa', adicionales: 'adicional' };
+
 export function render(contenedor, params = {}) {
   if (!params.id && !params.categoria) return renderElegirCategoria(contenedor);
-  if (!params.id && params.categoria === 'adicionales') {
-    return renderCalculadora(contenedor, { categoria: 'adicionales' });
-  }
   return renderPresupuesto(contenedor, params);
 }
 
@@ -83,15 +83,16 @@ function renderPresupuesto(contenedor, params) {
 
   // Un presupuesto es de una sola categoría: se elige al crearlo. Al editar
   // uno ya guardado, la deducimos de sus renglones en vez de pedirla de nuevo.
-  const esPlacas = existente ? existente.items?.some((it) => it.tipo === 'placa') : params.categoria === 'placas';
+  const categoria = existente ? categoriaDoc(existente) : (CLAVE_CATEGORIA[params.categoria] || 'cortina');
+  const cat = CATEGORIA[categoria];
 
-  const doc = existente ? { ...existente } : docVacio(esPlacas ? 'placa' : 'roller');
+  const doc = existente ? { ...existente } : docVacio(cat.tipoItem);
 
   contenedor.innerHTML = `
     <div class="titulo-pagina">
       <div>
         <h1>${existente ? `Presupuesto ${existente.numero}` : 'Nuevo presupuesto'}</h1>
-        <div class="sub">${existente ? 'Editando un presupuesto guardado' : esPlacas ? 'Cargá las placas y mirá el total en vivo. El cliente es opcional.' : 'Cargá las cortinas y mirá el total en vivo. El cliente es opcional.'}</div>
+        <div class="sub">${existente ? 'Editando un presupuesto guardado' : `Cargá ${cat.conArticulo} y mirá el total en vivo. El cliente es opcional.`}</div>
       </div>
     </div>
     <div data-editor></div>
@@ -102,16 +103,15 @@ function renderPresupuesto(contenedor, params) {
   const editor = montarEditor(contenedor.querySelector('[data-editor]'), doc, {
     alCambiar: () => pintarBarra(),
     clienteOpcional: true,
-    tipoInicial: esPlacas ? 'placa' : 'roller',
-    tituloSeccion: esPlacas ? 'Placas' : 'Cortinas',
-    etiquetaAgregar: esPlacas ? '+ Agregar otra placa' : '+ Agregar otra cortina',
+    tipoInicial: cat.tipoItem,
+    tituloSeccion: cat.titulo,
+    etiquetaAgregar: cat.agregar,
   });
 
   function pintarBarra() {
     const t = editor.totales();
-    const unidad = esPlacas ? 'placa' : 'cortina';
     barra.innerHTML = `
-      <div class="resumen-fijo__fila"><span>${t.cantidadCortinas} ${unidad}${t.cantidadCortinas === 1 ? '' : 's'}</span><span>${t.montoDescuento ? `descuento ${plata(t.montoDescuento)}` : ''}</span></div>
+      <div class="resumen-fijo__fila"><span>${contarItems(t.cantidadCortinas, categoria)}</span><span>${t.montoDescuento ? `descuento ${plata(t.montoDescuento)}` : ''}</span></div>
       <div class="resumen-fijo__total"><span>Total</span><span>${plata(t.total)}</span></div>
       <div class="fila-botones mt-16">
         <button class="btn btn--primario" data-guardar style="flex:1">${existente ? 'Guardar cambios' : 'Guardar presupuesto'}</button>

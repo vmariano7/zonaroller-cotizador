@@ -7,7 +7,7 @@ import { calcularTotales, descripcionItem, detallesTecnicos } from './calc.js';
 import { plata, num, fecha, esc, sumarDias, ajuste, medidaTexto } from './ui.js';
 import { datosContado } from './mensaje.js';
 
-const NOMBRE_TIPO = { roller: 'Roller', vertical: 'Bandas verticales', zebra: 'Zebra', tela_tradicional: 'Cortina Tela Tradicional', placa: 'Placa' };
+const NOMBRE_TIPO = { roller: 'Roller', vertical: 'Bandas verticales', zebra: 'Zebra', tela_tradicional: 'Cortina Tela Tradicional', placa: 'Placa', adicional: 'Adicional' };
 
 export function montarHoja(html, tituloVentana, claseExtra = '') {
   document.querySelectorAll('.hoja').forEach((n) => n.remove());
@@ -168,12 +168,14 @@ export function imprimirOrdenTrabajo(p) {
       </thead>
       <tbody>
         ${t.lineas.map(({ item, calc }) => {
-          // La placa va por superficie: no tiene ancho y alto que darle al taller.
+          // La placa va por superficie y el adicional por unidad: ninguno de
+          // los dos tiene ancho y alto que darle al taller.
           const esPlaca = item.tipo === 'placa';
+          const esAdicional = item.tipo === 'adicional';
           const enMetros = item.tipo === 'tela_tradicional';
-          const ancho = esPlaca ? `${num(calc.m2)} m²` : enMetros ? `${num(item.anchoM)} m` : `${num(item.anchoCm, 0)} cm`;
-          const alto = esPlaca ? '—' : enMetros ? `${num(item.altoM)} m` : `${num(item.altoCm, 0)} cm`;
-          const subtitulo = item.tipo === 'placa' ? item.producto : `${item.tela}${item.tipo === 'tela_tradicional' ? ` ${item.color || ''}` : ''}`;
+          const ancho = esAdicional ? '—' : esPlaca ? `${num(calc.m2)} m²` : enMetros ? `${num(item.anchoM)} m` : `${num(item.anchoCm, 0)} cm`;
+          const alto = esPlaca || esAdicional ? '—' : enMetros ? `${num(item.altoM)} m` : `${num(item.altoCm, 0)} cm`;
+          const subtitulo = esPlaca || esAdicional ? item.producto : `${item.tela}${enMetros ? ` ${item.color || ''}` : ''}`;
           // El taller necesita todo el armado: comando, cadena, caída, caño.
           const detalle = [...detallesTecnicos(item), item.detalle].filter(Boolean).join(' · ');
           return `

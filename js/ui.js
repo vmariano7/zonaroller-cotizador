@@ -163,7 +163,9 @@ export const ESTADOS_PEDIDO = {
  * (un solo casillero de m²) y las cortinas por ancho × alto.
  */
 export function medidaTexto(item, calc) {
-  return item?.tipo === 'placa' ? `${num(calc.m2)} m²` : `${num(calc.anchoM)} × ${num(calc.altoM)} m`;
+  if (item?.tipo === 'adicional') return '—';
+  if (item?.tipo === 'placa') return `${num(calc.m2)} m²`;
+  return `${num(calc.anchoM)} × ${num(calc.altoM)} m`;
 }
 
 export function chip(mapa, clave) {
