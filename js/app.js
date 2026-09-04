@@ -47,6 +47,7 @@ const icono = (nombre) =>
 
 definirRutas([
   { patron: '/cotizar', nav: 'cotizar', vista: vCotizar.render },
+  { patron: '/cotizar/nuevo/:categoria', nav: 'cotizar', vista: vCotizar.render },
   { patron: '/cotizar/:id', nav: 'cotizar', vista: vCotizar.render },
   { patron: '/presupuestos', nav: 'presupuestos', vista: vPresupuestos.render },
   { patron: '/presupuesto/:id', nav: 'presupuestos', vista: vPresupuestos.renderDetalle },

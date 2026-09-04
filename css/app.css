@@ -325,6 +325,21 @@ tbody tr:hover { background: var(--fondo-2); }
 }
 .tipo[aria-pressed="true"] .tipo__icono { color: var(--tinta); }
 
+/* Elegir la categoría al entrar al cotizador: Cortinas / Placas / Adicionales. */
+.categorias { display: grid; grid-template-columns: 1fr; gap: .75rem; }
+@media (min-width: 620px) { .categorias { grid-template-columns: repeat(3, 1fr); } }
+.categoria {
+  display: flex; flex-direction: column; align-items: flex-start; gap: .5rem;
+  padding: 1.4rem 1.2rem; border-radius: var(--radio);
+  border: 1px solid var(--linea); background: var(--fondo); cursor: pointer;
+  text-decoration: none; color: inherit;
+  transition: border-color .12s, box-shadow .12s, transform .12s;
+}
+.categoria:hover { border-color: var(--linea-fuerte); box-shadow: var(--sombra); transform: translateY(-1px); }
+.categoria__icono { width: 32px; height: 32px; color: var(--acento); display: block; }
+.categoria__nombre { font-size: 1.05rem; font-weight: 700; }
+.categoria__desc { font-size: .8rem; color: var(--tinta-3); }
+
 .avanzadas > summary {
   cursor: pointer; font-size: .78rem; font-weight: 600; color: var(--tinta-2);
   list-style: none; display: inline-flex; align-items: center; gap: .35rem;

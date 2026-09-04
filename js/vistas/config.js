@@ -3,7 +3,7 @@
 
 import { estado, guardarConfig, cerrarSesion, sincronizar, exportarRespaldo, importarRespaldo } from '../store.js';
 import { TIPOS, SISTEMAS } from '../calc.js';
-import { esc, aviso, confirmar, descargarArchivo, fecha } from '../ui.js';
+import { esc, aviso, confirmar, descargarArchivo, fecha, plata, modal } from '../ui.js';
 import { PLANTILLA_POR_DEFECTO, CLAVES } from '../mensaje.js';
 import { tienePin, definirPin } from '../candado.js';
 
@@ -30,8 +30,11 @@ export function render(contenedor) {
       <div class="grid grid--3">
         ${Object.entries(TIPOS).filter(([tipo]) => tipo !== 'tela_tradicional').map(([tipo, def]) => `
           <div>
-            <h3 style="padding-bottom:.4rem;border-bottom:2px solid var(--linea-fuerte);margin-bottom:.6rem">${esc(def.nombre)}</h3>
-            ${def.telas.map((tela) => `
+            <h3 style="padding-bottom:.4rem;border-bottom:2px solid var(--linea-fuerte);margin-bottom:.6rem;display:flex;align-items:center;gap:.5rem">
+              <span style="flex:1">${esc(def.nombre)}</span>
+              <button class="btn btn--chico btn--fantasma" data-gestionar-telas="${tipo}" style="font-size:.7rem;padding:.3rem .6rem">Agregar / borrar</button>
+            </h3>
+            ${(c.catalogoTelas?.[tipo] || def.telas).map((tela) => `
               <div class="campo" style="display:flex;align-items:center;gap:.6rem">
                 <label style="flex:1;margin:0;font-weight:500;color:var(--acento)">${esc(tela)}</label>
                 <div class="con-prefijo" style="width:130px"><span>$</span>
@@ -49,9 +52,48 @@ export function render(contenedor) {
       <div class="tarjeta">
         <div class="tarjeta__cab">
           <span class="seccion-num">02</span>
+          <div><h2>Placas</h2><div class="mini">Productos para la calculadora de Placas del cotizador.</div></div>
+        </div>
+        ${(c.placas || []).length ? `
+          <div class="lista">
+            ${(c.placas || []).map((p) => `
+              <div class="campo" style="display:flex;align-items:center;gap:.6rem">
+                <span style="flex:1;font-weight:500">${esc(p.nombre)}</span>
+                <strong>${plata(p.precio)}</strong>
+              </div>`).join('')}
+          </div>
+        ` : '<div class="mini">Todavía no cargaste ninguna placa.</div>'}
+        <button class="btn btn--chico mt-16" data-gestionar-productos="placas" style="width:100%">Agregar / editar / borrar</button>
+      </div>
+
+      <div class="tarjeta">
+        <div class="tarjeta__cab">
+          <span class="seccion-num">03</span>
+          <div><h2>Adicionales</h2><div class="mini">Productos para la calculadora de Adicionales del cotizador.</div></div>
+        </div>
+        ${(c.adicionales || []).length ? `
+          <div class="lista">
+            ${(c.adicionales || []).map((p) => `
+              <div class="campo" style="display:flex;align-items:center;gap:.6rem">
+                <span style="flex:1;font-weight:500">${esc(p.nombre)}</span>
+                <strong>${plata(p.precio)}</strong>
+              </div>`).join('')}
+          </div>
+        ` : '<div class="mini">Todavía no cargaste ningún adicional.</div>'}
+        <button class="btn btn--chico mt-16" data-gestionar-productos="adicionales" style="width:100%">Agregar / editar / borrar</button>
+      </div>
+    </div>
+
+    <div class="grid grid--2">
+      <div class="tarjeta">
+        <div class="tarjeta__cab">
+          <span class="seccion-num">04</span>
           <div><h2>Costos de sistemas</h2><div class="mini">Valor por metro lineal (se calcula sobre el ancho).</div></div>
         </div>
-        ${Object.entries(SISTEMAS).map(([clave, nombre]) => `
+        <div style="display:flex;justify-content:flex-end;margin-bottom:.4rem">
+          <button class="btn btn--chico btn--fantasma" data-gestionar-sistemas style="font-size:.7rem;padding:.3rem .6rem">Agregar / renombrar / borrar</button>
+        </div>
+        ${(c.catalogoSistemas || Object.entries(SISTEMAS).map(([id, nombre]) => ({ id, nombre }))).map(({ id: clave, nombre }) => `
           <div class="campo" style="display:flex;align-items:center;gap:.6rem">
             <label style="flex:1;margin:0;font-weight:500">${esc(nombre)}</label>
             <div class="con-prefijo" style="width:140px"><span>$</span>
@@ -106,7 +148,7 @@ export function render(contenedor) {
       <div>
         <div class="tarjeta">
           <div class="tarjeta__cab">
-            <span class="seccion-num">03</span>
+            <span class="seccion-num">05</span>
             <div><h2>Incrementos</h2><div class="mini">Activá y definí el porcentaje por artículo.</div></div>
           </div>
           ${Object.entries(TIPOS).map(([tipo, def]) => {
@@ -132,7 +174,7 @@ export function render(contenedor) {
 
         <div class="tarjeta">
           <div class="tarjeta__cab">
-            <span class="seccion-num">04</span>
+            <span class="seccion-num">06</span>
             <div><h2>Reglas de cálculo</h2></div>
           </div>
           <div class="campos campos--2">
@@ -168,7 +210,7 @@ export function render(contenedor) {
 
     <div class="tarjeta">
       <div class="tarjeta__cab">
-        <span class="seccion-num">05</span>
+        <span class="seccion-num">07</span>
         <div><h2>Datos de Zona Roller</h2><div class="mini">Aparecen en el encabezado del PDF.</div></div>
       </div>
       <div class="campos campos--3">
@@ -192,7 +234,7 @@ export function render(contenedor) {
 
     <div class="tarjeta">
       <div class="tarjeta__cab">
-        <span class="seccion-num">06</span>
+        <span class="seccion-num">08</span>
         <div><h2>Precio de contado y mensaje</h2><div class="mini">Lo que sale por defecto en cada cotización. En cada presupuesto lo podés cambiar.</div></div>
       </div>
       <div class="campos campos--2">
@@ -222,7 +264,7 @@ export function render(contenedor) {
 
     <div class="tarjeta">
       <div class="tarjeta__cab">
-        <span class="seccion-num">07</span>
+        <span class="seccion-num">09</span>
         <div><h2>Tu cuenta</h2><div class="mini">Con la misma cuenta ves los mismos datos en la compu y en el celular.</div></div>
       </div>
       <div class="banner banner--${estado.sync.estado === 'error' ? 'error' : estado.sync.activa ? 'info' : 'aviso'}">
@@ -242,7 +284,7 @@ export function render(contenedor) {
 
     <div class="tarjeta">
       <div class="tarjeta__cab">
-        <span class="seccion-num">08</span>
+        <span class="seccion-num">10</span>
         <div><h2>PIN de acceso</h2><div class="mini">${tienePin() ? 'Activado: la app lo pide cada vez que se abre.' : 'Desactivado: la app abre directo.'}</div></div>
       </div>
       <div class="campos campos--2">
@@ -262,7 +304,7 @@ export function render(contenedor) {
 
     <div class="tarjeta">
       <div class="tarjeta__cab">
-        <span class="seccion-num">09</span>
+        <span class="seccion-num">11</span>
         <div><h2>Respaldo</h2><div class="mini">Bajá una copia de todo o restaurá desde un archivo.</div></div>
       </div>
       <div class="fila-botones">
@@ -293,6 +335,17 @@ export function render(contenedor) {
     inp.addEventListener('input', () => {
       guardarPronto({ sistemas: { ...estado.config.sistemas, [inp.dataset.sistema]: leerCasillero(inp) } });
     })
+  );
+
+  /* ---- Catálogos: agregar / renombrar / borrar telas, sistemas y productos ---- */
+  contenedor.querySelectorAll('[data-gestionar-telas]').forEach((b) =>
+    b.addEventListener('click', () => dialogoTelas(b.dataset.gestionarTelas, () => render(contenedor)))
+  );
+  contenedor.querySelector('[data-gestionar-sistemas]')?.addEventListener('click', () =>
+    dialogoSistemas(() => render(contenedor))
+  );
+  contenedor.querySelectorAll('[data-gestionar-productos]').forEach((b) =>
+    b.addEventListener('click', () => dialogoProductos(b.dataset.gestionarProductos, () => render(contenedor)))
   );
 
   /* ---- Números sueltos ---- */
@@ -441,4 +494,232 @@ export function render(contenedor) {
       e.target.value = '';
     }
   });
+}
+
+/**
+ * Agregar, renombrar o borrar telas de un tipo (roller, vertical o zebra).
+ * Roller y vertical llevan además el tilde de "sistema básico": las telas
+ * tildadas usan el sistema económico (ver `telasSistemaBasico` en calc.js);
+ * las demás usan el sistema "demás telas". Zebra tiene un solo sistema, así
+ * que ahí no hace falta elegir.
+ */
+function dialogoTelas(tipo, alGuardar) {
+  const nombreTipo = TIPOS[tipo].nombre;
+  const nombresOriginales = estado.config.catalogoTelas?.[tipo] || TIPOS[tipo].telas;
+  const precios = estado.config.telas?.[tipo] || {};
+  const basicas = new Set(estado.config.telasSistemaBasico || []);
+  const conSistema = tipo !== 'zebra';
+
+  let lista = nombresOriginales.map((n) => ({ nombre: n, precio: Number(precios[n]) || 0, basico: basicas.has(n) }));
+  if (!lista.length) lista.push({ nombre: '', precio: 0, basico: false });
+
+  const m = modal(`Telas de ${nombreTipo}`, `
+    <div class="mini mb-16">Agregá, renombrá o borrá telas de ${nombreTipo.toLowerCase()}.
+    ${conSistema ? ' Tildá <strong>sistema básico</strong> para las que usan el sistema más económico (por defecto Blackout y Sunscreen 5%); el resto usa "demás telas".' : ''}</div>
+    <div data-filas></div>
+    <button class="btn btn--chico mt-16" data-agregar style="width:100%">+ Agregar tela</button>
+    <div class="fila-botones fila-botones--fin mt-16">
+      <button class="btn btn--fantasma" data-cerrar>Cancelar</button>
+      <button class="btn btn--primario" id="tl-ok">Guardar</button>
+    </div>`, { ancho: '640px' });
+
+  const cajaFilas = m.cuerpo.querySelector('[data-filas]');
+
+  function pintarFilas() {
+    cajaFilas.innerHTML = lista.map((t, i) => `
+      <div class="campo" style="display:flex;align-items:center;gap:.5rem;margin-bottom:.5rem">
+        <input data-nombre="${i}" placeholder="Ej. Sunscreen 3%" value="${esc(t.nombre)}" style="flex:1">
+        <div class="con-prefijo" style="width:130px"><span>$</span>
+          <input type="number" inputmode="decimal" min="0" step="1" data-precio="${i}" value="${t.precio}">
+        </div>
+        ${conSistema ? `
+        <label class="switch" style="margin:0" title="Usa el sistema básico">
+          <input type="checkbox" data-basico="${i}"${t.basico ? ' checked' : ''}>
+          <span class="switch__pista"></span>
+        </label>` : ''}
+        <button class="btn-icono" data-quitar="${i}" title="Quitar">&#10005;</button>
+      </div>`).join('');
+
+    cajaFilas.querySelectorAll('[data-nombre]').forEach((inp) =>
+      inp.addEventListener('input', () => { lista[Number(inp.dataset.nombre)].nombre = inp.value; })
+    );
+    cajaFilas.querySelectorAll('[data-precio]').forEach((inp) =>
+      inp.addEventListener('input', () => { lista[Number(inp.dataset.precio)].precio = Number(inp.value) || 0; })
+    );
+    cajaFilas.querySelectorAll('[data-basico]').forEach((inp) =>
+      inp.addEventListener('change', () => { lista[Number(inp.dataset.basico)].basico = inp.checked; })
+    );
+    cajaFilas.querySelectorAll('[data-quitar]').forEach((b) =>
+      b.addEventListener('click', () => {
+        lista.splice(Number(b.dataset.quitar), 1);
+        if (!lista.length) lista.push({ nombre: '', precio: 0, basico: false });
+        pintarFilas();
+      })
+    );
+  }
+  pintarFilas();
+
+  m.cuerpo.querySelector('[data-agregar]').addEventListener('click', () => {
+    lista.push({ nombre: '', precio: 0, basico: false });
+    pintarFilas();
+  });
+
+  m.cuerpo.querySelector('#tl-ok').onclick = async () => {
+    const limpia = lista.map((t) => ({ ...t, nombre: t.nombre.trim() })).filter((t) => t.nombre);
+    if (!limpia.length) {
+      aviso('Cargá al menos una tela.', 'error');
+      return;
+    }
+    const nombresNuevos = [...new Set(limpia.map((t) => t.nombre))];
+    const preciosNuevos = { ...precios };
+    nombresNuevos.forEach((n) => { preciosNuevos[n] = limpia.find((t) => t.nombre === n).precio; });
+
+    const cambios = {
+      catalogoTelas: { ...estado.config.catalogoTelas, [tipo]: nombresNuevos },
+      telas: { ...estado.config.telas, [tipo]: preciosNuevos },
+    };
+    if (conSistema) {
+      // Las telas que no pertenecen a este tipo (por ejemplo, si el nombre
+      // también existe en el otro tipo) quedan como estaban; acá solo se
+      // actualiza la parte de la lista que corresponde a las telas editadas.
+      const ajenas = (estado.config.telasSistemaBasico || []).filter((n) => !nombresOriginales.includes(n));
+      const propias = limpia.filter((t) => t.basico).map((t) => t.nombre);
+      cambios.telasSistemaBasico = [...ajenas, ...propias];
+    }
+    await guardarConfig(cambios);
+    m.cerrar();
+    aviso('Telas actualizadas.');
+    alGuardar?.();
+  };
+}
+
+/**
+ * Agregar, renombrar o borrar sistemas. Los 5 que arma el cálculo automático
+ * (roller/vertical × básico/demás, y zebra) se pueden renombrar o borrar
+ * igual que cualquier otro: si se borra uno que el cálculo sigue necesitando,
+ * esa combinación de tela pasa a costar $0 de sistema hasta que se cargue uno
+ * nuevo (igual que cualquier costo sin cargar en esta app).
+ */
+function dialogoSistemas(alGuardar) {
+  const catalogoOriginal = estado.config.catalogoSistemas?.length
+    ? estado.config.catalogoSistemas
+    : Object.entries(SISTEMAS).map(([id, nombre]) => ({ id, nombre, protegido: true }));
+  let lista = catalogoOriginal.map((s) => ({ ...s, precio: Number(estado.config.sistemas?.[s.id]) || 0 }));
+
+  const m = modal('Sistemas', `
+    <div class="mini mb-16">Agregá, renombrá o borrá sistemas. Los marcados con ★ son los que elige
+    solo el cálculo según la tela (no se asignan a mano).</div>
+    <div data-filas></div>
+    <button class="btn btn--chico mt-16" data-agregar style="width:100%">+ Agregar sistema</button>
+    <div class="fila-botones fila-botones--fin mt-16">
+      <button class="btn btn--fantasma" data-cerrar>Cancelar</button>
+      <button class="btn btn--primario" id="ss-ok">Guardar</button>
+    </div>`, { ancho: '640px' });
+
+  const cajaFilas = m.cuerpo.querySelector('[data-filas]');
+
+  function pintarFilas() {
+    cajaFilas.innerHTML = lista.map((s, i) => `
+      <div class="campo" style="display:flex;align-items:center;gap:.5rem;margin-bottom:.5rem">
+        <input data-nombre="${i}" placeholder="Nombre del sistema" value="${esc(s.nombre)}" style="flex:1">
+        ${s.protegido ? '<span class="mini" title="Lo asigna solo el cálculo">★</span>' : ''}
+        <div class="con-prefijo" style="width:140px"><span>$</span>
+          <input type="number" inputmode="decimal" min="0" step="1" data-precio="${i}" value="${s.precio}">
+        </div>
+        <button class="btn-icono" data-quitar="${i}" title="Quitar">&#10005;</button>
+      </div>`).join('');
+
+    cajaFilas.querySelectorAll('[data-nombre]').forEach((inp) =>
+      inp.addEventListener('input', () => { lista[Number(inp.dataset.nombre)].nombre = inp.value; })
+    );
+    cajaFilas.querySelectorAll('[data-precio]').forEach((inp) =>
+      inp.addEventListener('input', () => { lista[Number(inp.dataset.precio)].precio = Number(inp.value) || 0; })
+    );
+    cajaFilas.querySelectorAll('[data-quitar]').forEach((b) =>
+      b.addEventListener('click', () => {
+        lista.splice(Number(b.dataset.quitar), 1);
+        pintarFilas();
+      })
+    );
+  }
+  pintarFilas();
+
+  m.cuerpo.querySelector('[data-agregar]').addEventListener('click', () => {
+    lista.push({ id: crypto.randomUUID(), nombre: '', protegido: false, precio: 0 });
+    pintarFilas();
+  });
+
+  m.cuerpo.querySelector('#ss-ok').onclick = async () => {
+    const limpia = lista.map((s) => ({ ...s, nombre: s.nombre.trim() })).filter((s) => s.nombre);
+    const catalogoSistemas = limpia.map(({ id, nombre, protegido }) => ({ id, nombre, protegido: !!protegido }));
+    const sistemas = Object.fromEntries(limpia.map((s) => [s.id, s.precio]));
+    await guardarConfig({ catalogoSistemas, sistemas });
+    m.cerrar();
+    aviso('Sistemas actualizados.');
+    alGuardar?.();
+  };
+}
+
+/**
+ * Agregar, editar o borrar productos de Placas o Adicionales: cada uno es
+ * simplemente nombre + precio, que la calculadora del cotizador multiplica
+ * por la cantidad que se cargue.
+ */
+function dialogoProductos(categoria, alGuardar) {
+  const titulo = categoria === 'placas' ? 'Placas' : 'Adicionales';
+  let lista = (estado.config[categoria] || []).map((p) => ({ ...p }));
+  if (!lista.length) lista.push({ id: crypto.randomUUID(), nombre: '', precio: 0 });
+
+  const m = modal(`Productos: ${titulo}`, `
+    <div class="mini mb-16">Estos son los productos que vas a poder elegir en la calculadora de
+    ${titulo.toLowerCase()} del cotizador. El total sale de multiplicar el precio por la cantidad.</div>
+    <div data-filas></div>
+    <button class="btn btn--chico mt-16" data-agregar style="width:100%">+ Agregar producto</button>
+    <div class="fila-botones fila-botones--fin mt-16">
+      <button class="btn btn--fantasma" data-cerrar>Cancelar</button>
+      <button class="btn btn--primario" id="pr-ok">Guardar</button>
+    </div>`, { ancho: '560px' });
+
+  const cajaFilas = m.cuerpo.querySelector('[data-filas]');
+
+  function pintarFilas() {
+    cajaFilas.innerHTML = lista.map((p, i) => `
+      <div class="campo" style="display:flex;align-items:center;gap:.5rem;margin-bottom:.5rem">
+        <input data-nombre="${i}" placeholder="Ej. Placa decorativa 60x60" value="${esc(p.nombre)}" style="flex:1">
+        <div class="con-prefijo" style="width:150px"><span>$</span>
+          <input type="number" inputmode="decimal" min="0" step="1" data-precio="${i}" value="${Number(p.precio) || 0}">
+        </div>
+        <button class="btn-icono" data-quitar="${i}" title="Quitar">&#10005;</button>
+      </div>`).join('');
+
+    cajaFilas.querySelectorAll('[data-nombre]').forEach((inp) =>
+      inp.addEventListener('input', () => { lista[Number(inp.dataset.nombre)].nombre = inp.value; })
+    );
+    cajaFilas.querySelectorAll('[data-precio]').forEach((inp) =>
+      inp.addEventListener('input', () => { lista[Number(inp.dataset.precio)].precio = Number(inp.value) || 0; })
+    );
+    cajaFilas.querySelectorAll('[data-quitar]').forEach((b) =>
+      b.addEventListener('click', () => {
+        lista.splice(Number(b.dataset.quitar), 1);
+        if (!lista.length) lista.push({ id: crypto.randomUUID(), nombre: '', precio: 0 });
+        pintarFilas();
+      })
+    );
+  }
+  pintarFilas();
+
+  m.cuerpo.querySelector('[data-agregar]').addEventListener('click', () => {
+    lista.push({ id: crypto.randomUUID(), nombre: '', precio: 0 });
+    pintarFilas();
+  });
+
+  m.cuerpo.querySelector('#pr-ok').onclick = async () => {
+    const limpia = lista
+      .filter((p) => p.nombre.trim())
+      .map((p) => ({ id: p.id || crypto.randomUUID(), nombre: p.nombre.trim(), precio: Number(p.precio) || 0 }));
+    await guardarConfig({ [categoria]: limpia });
+    m.cerrar();
+    aviso('Productos actualizados.');
+    alGuardar?.();
+  };
 }

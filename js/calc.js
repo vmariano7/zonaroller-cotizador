@@ -39,6 +39,26 @@ export const SISTEMAS = {
 };
 
 /**
+ * Nombre a mostrar de un sistema. Antes `SISTEMAS` era la única fuente; ahora
+ * el catálogo vive en `config.catalogoSistemas` (editable desde Ajustes) y
+ * `SISTEMAS` queda como default para configs viejas que todavía no lo tienen.
+ */
+export function nombreSistema(id, config) {
+  const enCatalogo = (config?.catalogoSistemas || []).find((s) => s.id === id);
+  return enCatalogo?.nombre || SISTEMAS[id] || id;
+}
+
+/**
+ * Telas disponibles para un tipo (roller, vertical, zebra). El catálogo real
+ * vive en `config.catalogoTelas` (editable desde Ajustes); `TIPOS[tipo].telas`
+ * queda como default para configs viejas que todavía no lo tienen.
+ */
+export function telasDeTipo(tipo, config) {
+  const cat = config?.catalogoTelas?.[tipo];
+  return Array.isArray(cat) && cat.length ? cat : (TIPOS[tipo]?.telas || []);
+}
+
+/**
  * Cómo se arma cada cortina. No entra en el precio: son las decisiones que
  * necesita el taller y que viajan a la orden de trabajo.
  * Ojo con `sistemaCano`: es el diámetro del caño, otra cosa que el `sistemaKey`
@@ -72,14 +92,31 @@ export const ARMADO_POR_TIPO = {
 export function configVacia() {
   const cero = (telas) => Object.fromEntries(telas.map((t) => [t, 0]));
   return {
+    // Catálogo de telas por tipo: la lista de nombres se puede agregar, editar
+    // (renombrar) y borrar desde Ajustes. Arranca con las de siempre para que
+    // no cambie nada hasta que lo toques.
+    catalogoTelas: {
+      roller: [...TIPOS.roller.telas],
+      vertical: [...TIPOS.vertical.telas],
+      zebra: [...TIPOS.zebra.telas],
+    },
     telas: {
       roller: cero(TIPOS.roller.telas),
       vertical: cero(TIPOS.vertical.telas),
       zebra: cero(TIPOS.zebra.telas),
     },
+    // Catálogo de sistemas: igual que las telas, editable desde Ajustes.
+    // `protegido` son los 5 que arma el cálculo automático (ver sistemaAuto);
+    // se pueden renombrar o borrar igual, pero Ajustes avisa antes de borrarlos.
+    catalogoSistemas: Object.entries(SISTEMAS).map(([id, nombre]) => ({ id, nombre, protegido: true })),
     sistemas: { roller_basico: 0, roller_demas: 0, vertical_basico: 0, vertical_demas: 0, zebra: 0 },
     // Telas que usan el sistema "básico" (más económico) en roller y vertical.
     telasSistemaBasico: ['Blackout', 'Sunscreen 5%'],
+    // Placas y adicionales: catálogos de productos simples (nombre + precio)
+    // que se cargan enteramente desde Ajustes. La "calculadora" de cada uno
+    // sólo multiplica precio × cantidad, sin fórmula ni incremento.
+    placas: [],
+    adicionales: [],
     incrementos: {
       roller: { activo: true, valor: 0 },
       vertical: { activo: true, valor: 0 },
@@ -348,7 +385,7 @@ export function calcularItem(item, config, contexto = {}) {
     cantidad,
     precioTela,
     sistemaKey,
-    sistemaNombre: SISTEMAS[sistemaKey] || sistemaKey,
+    sistemaNombre: nombreSistema(sistemaKey, config),
     precioSistema,
     costoTela,
     costoSistema,

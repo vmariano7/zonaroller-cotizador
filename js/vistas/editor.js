@@ -2,7 +2,7 @@
 // El orden importa: primero las cortinas (que es lo que se cotiza a diario) y
 // los datos del cliente arriba, plegados, para que no tapen lo principal.
 
-import { TIPOS, SISTEMAS, ARMADO, ARMADO_POR_TIPO, itemVacio, calcularItem, calcularTotales, hayPreciosCargados, descripcionItem, detallesTecnicos, admiteMotor } from '../calc.js';
+import { TIPOS, ARMADO, ARMADO_POR_TIPO, itemVacio, calcularItem, calcularTotales, hayPreciosCargados, descripcionItem, detallesTecnicos, admiteMotor, telasDeTipo } from '../calc.js';
 import { estado } from '../store.js';
 import { el, esc, plata, num, leerNumero, hoyISO, aviso } from '../ui.js';
 import { armarMensaje, datosContado, copiar } from '../mensaje.js';
@@ -292,7 +292,7 @@ export function montarEditor(contenedor, doc, { alCambiar, clienteOpcional = fal
   function nodoItem(item, indice) {
     const config = estado.config;
     const esTelaTradicional = item.tipo === 'tela_tradicional';
-    const telas = TIPOS[item.tipo]?.telas || [];
+    const telas = esTelaTradicional ? (TIPOS.tela_tradicional.telas || []) : telasDeTipo(item.tipo, config);
     if (!telas.includes(item.tela)) item.tela = telas[0] || '';
 
     if (esTelaTradicional) {
@@ -518,7 +518,7 @@ export function montarEditor(contenedor, doc, { alCambiar, clienteOpcional = fal
       if (descripcion) partes.unshift(`<span class="mini">${esc(descripcion)}</span>`);
     } else {
       partes.push(`${num(c.m2)} m²${c.aplicaMinimo ? ' <span class="mini">(mínimo)</span>' : ''}`);
-      partes.push(`sistema ${esc(SISTEMAS[c.sistemaKey] || '—')}`);
+      partes.push(`sistema ${esc(c.sistemaNombre || '—')}`);
       if (c.incrementoPct) partes.push(`+${num(c.incrementoPct, 0)}%`);
       sinPrecio = c.precioTela === 0 || c.precioSistema === 0;
     }
