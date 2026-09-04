@@ -158,6 +158,14 @@ export const ESTADOS_PEDIDO = {
   cancelado: { texto: 'Cancelado', clase: 'rojo' },
 };
 
+/**
+ * La medida de un renglón, en texto: las placas se cotizan por superficie
+ * (un solo casillero de m²) y las cortinas por ancho × alto.
+ */
+export function medidaTexto(item, calc) {
+  return item?.tipo === 'placa' ? `${num(calc.m2)} m²` : `${num(calc.anchoM)} × ${num(calc.altoM)} m`;
+}
+
 export function chip(mapa, clave) {
   const e = mapa[clave] || { texto: clave || '—', clase: 'gris' };
   return `<span class="chip chip--${e.clase}">${esc(e.texto)}</span>`;

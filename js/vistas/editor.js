@@ -2,7 +2,7 @@
 // El orden importa: primero las cortinas (que es lo que se cotiza a diario) y
 // los datos del cliente arriba, plegados, para que no tapen lo principal.
 
-import { TIPOS, ARMADO, ARMADO_POR_TIPO, itemVacio, calcularItem, calcularTotales, hayPreciosCargados, descripcionItem, detallesTecnicos, admiteMotor, telasDeTipo } from '../calc.js';
+import { TIPOS, ARMADO, ARMADO_POR_TIPO, itemVacio, calcularItem, calcularTotales, hayPreciosCargados, descripcionItem, detallesTecnicos, admiteMotor, telasDeTipo, superficiePlaca } from '../calc.js';
 import { estado } from '../store.js';
 import { el, esc, plata, num, leerNumero, hoyISO, aviso } from '../ui.js';
 import { armarMensaje, datosContado, copiar } from '../mensaje.js';
@@ -562,6 +562,13 @@ export function montarEditor(contenedor, doc, {
       item.productoId = primero?.id ?? null;
       item.producto = primero?.nombre ?? '';
     }
+    // Antes la placa se cargaba con ancho y alto. Si el renglón viene así, lo
+    // pasamos a superficie una sola vez, al abrirlo.
+    if (item.m2 == null && (item.anchoM != null || item.altoM != null)) {
+      item.m2 = superficiePlaca(item) || null;
+      delete item.anchoM;
+      delete item.altoM;
+    }
 
     const nodo = el(`
       <div class="cortina" data-id="${item.id}">
@@ -571,7 +578,7 @@ export function montarEditor(contenedor, doc, {
           <button class="btn-icono" data-quitar title="Quitar placa">&#10005;</button>
         </div>
 
-        <div class="campos campos--4 mt-16">
+        <div class="campos campos--3 mt-16">
           <div>
             <label>Producto</label>
             <select data-campo="productoId">
@@ -579,12 +586,8 @@ export function montarEditor(contenedor, doc, {
             </select>
           </div>
           <div>
-            <label>Ancho</label>
-            <div class="con-sufijo"><input data-medida="anchoM" type="text" inputmode="decimal" placeholder="0" value="${mostrarMedida(item.anchoM)}"><span>m</span></div>
-          </div>
-          <div>
-            <label>Alto</label>
-            <div class="con-sufijo"><input data-medida="altoM" type="text" inputmode="decimal" placeholder="0" value="${mostrarMedida(item.altoM)}"><span>m</span></div>
+            <label>Superficie</label>
+            <div class="con-sufijo"><input data-medida="m2" type="text" inputmode="decimal" placeholder="0" value="${mostrarMedida(item.m2)}"><span>m²</span></div>
           </div>
           <div>
             <label>Cantidad</label>
@@ -663,6 +666,7 @@ export function montarEditor(contenedor, doc, {
   function pintarResumenPlaca(nodo, item) {
     const c = calcularItem(item, estado.config, {});
     const partes = [`${num(c.m2)} m²`];
+    if (c.incrementoPct) partes.push(`+${num(c.incrementoPct, 0)}%`);
     if (item.colocacion) partes.push(`colocación ${plata(c.costoColocacion / c.cantidad)} <span class="mini">(al costo)</span>`);
     if (item.envio) partes.push(`envío ${plata(c.costoEnvio / c.cantidad)} <span class="mini">(al costo)</span>`);
     const sinPrecio = !item.productoId || c.precioTela === 0;

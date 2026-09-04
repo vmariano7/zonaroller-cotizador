@@ -3,7 +3,7 @@
 import { estado, guardar, borrar, obtener, proximoNumero } from '../store.js';
 import { calcularTotales, descripcionItem, detallesTecnicos } from '../calc.js';
 import {
-  plata, num, fecha, esc, aviso, confirmar, chip, vacio, modal, hoyISO, leerNumero, ESTADOS_PEDIDO,
+  plata, num, fecha, esc, aviso, confirmar, chip, vacio, modal, hoyISO, leerNumero, ESTADOS_PEDIDO, medidaTexto,
 } from '../ui.js';
 import { navegar } from '../router.js';
 import { imprimirOrdenTrabajo } from '../pdf.js';
@@ -480,7 +480,7 @@ export function renderDetalle(contenedor, params) {
               <tr>
                 <td>${esc(item.ambiente || '—')}${armado(item) ? `<div class="mini">${esc(armado(item))}</div>` : ''}</td>
                 <td>${esc({ roller: 'Roller', vertical: 'Bandas verticales', zebra: 'Zebra', tela_tradicional: 'Cortina Tela Tradicional', placa: 'Placa' }[item.tipo] || item.tipo)}<div class="mini">${esc(descripcionItem(item) || item.tela)}</div></td>
-                <td class="num">${num(calc.anchoM)} × ${num(calc.altoM)} m</td>
+                <td class="num">${medidaTexto(item, calc)}</td>
                 <td class="num mini">${esc(calc.sistemaNombre)}</td>
                 <td class="num">${calc.cantidad}</td>
                 <td class="num"><strong>${plata(calc.total)}</strong></td>

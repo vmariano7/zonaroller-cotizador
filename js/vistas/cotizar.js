@@ -21,19 +21,29 @@ const CATEGORIAS = [
     clave: 'cortinas',
     nombre: 'Cortinas',
     desc: 'Roller, bandas verticales, zebra y tela tradicional',
-    icono: '<path d="M4 3h16v18H4z"/><path d="M8 7h8M8 11h3M8 15h3M15 11v5"/>',
+    icono: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round">
+      <rect x="3.5" y="3" width="17" height="2.5" rx="1" fill="currentColor" stroke="none"/>
+      <rect x="4.5" y="5.5" width="15" height="12.5" rx=".5"/>
+      <path d="M4.5 9h15M4.5 12h15M4.5 15h15" opacity=".45"/>
+      <path d="M7.5 18v2.5M16.5 18v2.5" opacity=".45"/></svg>`,
   },
   {
     clave: 'placas',
     nombre: 'Placas',
-    desc: 'Presupuesto por producto y m²',
-    icono: '<rect x="4" y="4" width="16" height="16" rx="1.5"/><path d="M4 10h16M10 4v16"/>',
+    desc: 'Por m², con colocación y envío',
+    icono: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round">
+      <rect x="3.5" y="3.5" width="7" height="7" rx="1.2"/>
+      <rect x="13.5" y="3.5" width="7" height="7" rx="1.2"/>
+      <rect x="3.5" y="13.5" width="7" height="7" rx="1.2"/>
+      <rect x="13.5" y="13.5" width="7" height="7" rx="1.2"/></svg>`,
   },
   {
     clave: 'adicionales',
     nombre: 'Adicionales',
     desc: 'Calculadora por unidades',
-    icono: '<circle cx="12" cy="12" r="9"/><path d="M12 7.5v9M7.5 12h9"/>',
+    icono: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M3.6 12.6 12 4.2h7.8V12l-8.4 8.4a2 2 0 0 1-2.8 0l-5-5a2 2 0 0 1 0-2.8Z"/>
+      <circle cx="15.9" cy="8.1" r="1.3"/></svg>`,
   },
 ];
 
@@ -53,9 +63,12 @@ function renderElegirCategoria(contenedor) {
     <div class="categorias">
       ${CATEGORIAS.map((c) => `
         <a class="categoria" href="#/cotizar/nuevo/${c.clave}">
-          <svg class="categoria__icono" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round">${c.icono}</svg>
-          <span class="categoria__nombre">${esc(c.nombre)}</span>
-          <span class="categoria__desc">${esc(c.desc)}</span>
+          <span class="categoria__chip">${c.icono}</span>
+          <span class="categoria__texto">
+            <span class="categoria__nombre">${esc(c.nombre)}</span>
+            <span class="categoria__desc">${esc(c.desc)}</span>
+          </span>
+          <svg class="categoria__flecha" viewBox="0 0 8 12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M1.5 1l5 5-5 5"/></svg>
         </a>`).join('')}
     </div>
   `;

@@ -4,7 +4,7 @@
 
 import { estado } from './store.js';
 import { calcularTotales, descripcionItem, detallesTecnicos } from './calc.js';
-import { plata, num, fecha, esc, sumarDias, ajuste } from './ui.js';
+import { plata, num, fecha, esc, sumarDias, ajuste, medidaTexto } from './ui.js';
 import { datosContado } from './mensaje.js';
 
 const NOMBRE_TIPO = { roller: 'Roller', vertical: 'Bandas verticales', zebra: 'Zebra', tela_tradicional: 'Cortina Tela Tradicional', placa: 'Placa' };
@@ -98,7 +98,7 @@ export function imprimirPresupuesto(p) {
           <tr>
             <td>${esc(item.ambiente || '—')}</td>
             <td>${esc(descripcionItem(item) || `${NOMBRE_TIPO[item.tipo] || item.tipo} · ${item.tela}`)}${calc.automatizada ? '<br><span style="font-size:8pt">Automatizada, con motor</span>' : ''}${item.tipo === 'placa' ? detallesTecnicos(item).map((d) => `<br><span style="font-size:8pt">${esc(d)}</span>`).join('') : ''}${item.detalle ? `<br><span style="font-size:8pt">${esc(item.detalle)}</span>` : ''}${item.instalacion ? '<br><span style="font-size:8pt">Instalación sin cargo</span>' : ''}</td>
-            <td class="num">${num(calc.anchoM)} × ${num(calc.altoM)} m</td>
+            <td class="num">${medidaTexto(item, calc)}</td>
             <td class="num">${calc.cantidad}</td>
             <td class="num">${plata(calc.precioUnitario)}</td>
             <td class="num">${plata(calc.total)}</td>
@@ -168,9 +168,11 @@ export function imprimirOrdenTrabajo(p) {
       </thead>
       <tbody>
         ${t.lineas.map(({ item, calc }) => {
-          const enMetros = item.tipo === 'tela_tradicional' || item.tipo === 'placa';
-          const ancho = enMetros ? `${num(item.anchoM)} m` : `${num(item.anchoCm, 0)} cm`;
-          const alto = enMetros ? `${num(item.altoM)} m` : `${num(item.altoCm, 0)} cm`;
+          // La placa va por superficie: no tiene ancho y alto que darle al taller.
+          const esPlaca = item.tipo === 'placa';
+          const enMetros = item.tipo === 'tela_tradicional';
+          const ancho = esPlaca ? `${num(calc.m2)} m²` : enMetros ? `${num(item.anchoM)} m` : `${num(item.anchoCm, 0)} cm`;
+          const alto = esPlaca ? '—' : enMetros ? `${num(item.altoM)} m` : `${num(item.altoCm, 0)} cm`;
           const subtitulo = item.tipo === 'placa' ? item.producto : `${item.tela}${item.tipo === 'tela_tradicional' ? ` ${item.color || ''}` : ''}`;
           // El taller necesita todo el armado: comando, cadena, caída, caño.
           const detalle = [...detallesTecnicos(item), item.detalle].filter(Boolean).join(' · ');

@@ -2,7 +2,7 @@
 
 import { estado, guardar, borrar, obtener, proximoNumero } from '../store.js';
 import { calcularTotales, descripcionItem, detallesTecnicos } from '../calc.js';
-import { plata, num, fecha, esc, aviso, confirmar, chip, vacio, ajuste, ESTADOS_PRESUPUESTO, sumarDias } from '../ui.js';
+import { plata, num, fecha, esc, aviso, confirmar, chip, vacio, ajuste, ESTADOS_PRESUPUESTO, sumarDias, medidaTexto } from '../ui.js';
 import { navegar } from '../router.js';
 import { imprimirPresupuesto } from '../pdf.js';
 import { armarMensaje, datosContado, copiar } from '../mensaje.js';
@@ -165,7 +165,7 @@ export function renderDetalle(contenedor, params) {
               <tr>
                 <td>${esc(item.ambiente || '—')}${item.detalle ? `<div class="mini">${esc(item.detalle)}</div>` : ''}</td>
                 <td>${esc({ roller: 'Roller', vertical: 'Bandas verticales', zebra: 'Zebra', tela_tradicional: 'Cortina Tela Tradicional', placa: 'Placa' }[item.tipo] || item.tipo)}<div class="mini">${esc(descripcionItem(item) || item.tela)}</div></td>
-                <td class="num">${num(calc.anchoM)} × ${num(calc.altoM)} m</td>
+                <td class="num">${item.tipo === 'placa' ? '—' : medidaTexto(item, calc)}</td>
                 <td class="num">${num(calc.m2)}</td>
                 <td class="num">${calc.cantidad}</td>
                 <td class="num">${plata(calc.precioUnitario)}</td>
@@ -218,7 +218,7 @@ export function renderDetalle(contenedor, params) {
     const lineas = t.lineas.map(({ item, calc }) => {
       const nombre = item.tipo === 'placa' ? (item.producto || 'Placa') : item.tela;
       const detalle = detallesTecnicos(item).join(', ');
-      return `• ${item.ambiente || 'Cortina'} — ${nombre}, ${num(calc.anchoM)} × ${num(calc.altoM)} m${detalle ? ` (${detalle})` : ''}${calc.cantidad > 1 ? ` (x${calc.cantidad})` : ''}: ${plata(calc.total)}`;
+      return `• ${item.ambiente || 'Cortina'} — ${nombre}, ${medidaTexto(item, calc)}${detalle ? ` (${detalle})` : ''}${calc.cantidad > 1 ? ` (x${calc.cantidad})` : ''}: ${plata(calc.total)}`;
     });
     const texto = [
       `Hola ${p.cliente.nombre}, te paso el presupuesto de ${emp.nombre || 'Zona Roller'} (${p.numero}):`,

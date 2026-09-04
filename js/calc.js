@@ -127,6 +127,8 @@ export function configVacia() {
       vertical: { activo: true, valor: 0 },
       zebra: { activo: true, valor: 0 },
       tela_tradicional: { activo: true, valor: 0 },
+      placa: { activo: true, valor: 0 },
+      adicional: { activo: true, valor: 0 },
     },
     // Lo que te sale el instalador. Se traslada al precio final de la cortina:
     // al cliente no se le cobra aparte, ya viene adentro. Ver costoInstaladorItem.
@@ -172,8 +174,7 @@ export function itemVacio(tipo = 'roller') {
       tipo,
       productoId: null,
       producto: '', // nombre copiado al elegir el producto: si lo borrás o renombrás después, el renglón viejo lo sigue mostrando igual
-      anchoM: null,
-      altoM: null,
+      m2: null,
       cantidad: 1,
       colocacion: false,
       envio: false,
@@ -238,6 +239,16 @@ export function detallesTecnicos(item) {
 }
 
 /**
+ * Superficie de una placa, en m². Se carga en un solo casillero.
+ * Los renglones viejos guardaban ancho y alto por separado: si vienen así,
+ * se multiplican, para que un presupuesto de antes siga dando lo mismo.
+ */
+export function superficiePlaca(item) {
+  if (item?.m2 != null && item.m2 !== '') return Number(item.m2) || 0;
+  return (Number(item?.anchoM) || 0) * (Number(item?.altoM) || 0);
+}
+
+/**
  * Descripción de línea para tela tradicional: "Cortina Tela [TELA] [COLOR]
  * [ANCHO]x[ALTO]m [RECOGIMIENTO]". Devuelve null para los demás tipos,
  * que ya se describen con tipo + tela.
@@ -247,9 +258,9 @@ export function detallesTecnicos(item) {
  */
 export function descripcionItem(item) {
   if (item.tipo === 'placa') {
-    const ancho = Number(item.anchoM) || 0;
-    const alto = Number(item.altoM) || 0;
-    return [item.producto || 'Placa', `${ancho}x${alto}m`].filter(Boolean).join(' ');
+    // Con coma, como se escribe acá: este texto sale impreso en el presupuesto.
+    const m2 = String(superficiePlaca(item)).replace('.', ',');
+    return [item.producto || 'Placa', `${m2} m²`].filter(Boolean).join(' ');
   }
   if (item.tipo !== 'tela_tradicional') return null;
   const ancho = Number(item.anchoM) || 0;
@@ -442,16 +453,22 @@ export function calcularItem(item, config, contexto = {}) {
  */
 function calcularItemPlaca(item, config) {
   const producto = (config.placas || []).find((p) => p.id === item.productoId);
-  const anchoM = Number(item.anchoM) || 0;
-  const altoM = Number(item.altoM) || 0;
   const cantidad = Math.max(1, Number(item.cantidad) || 1);
-  const area = anchoM * altoM;
+  const area = superficiePlaca(item);
 
   const precioM2 = Number(producto?.precio) || 0;
   const base = area * precioM2;
+
+  // La ganancia se calcula sobre la placa, igual que en las cortinas se
+  // calcula sobre tela y sistema: colocación y envío se suman después.
+  const reglaInc = config.incrementos?.placa || { activo: false, valor: 0 };
+  const incrementoPct = reglaInc.activo ? Number(reglaInc.valor) || 0 : 0;
+  const montoIncremento = base * (incrementoPct / 100);
+  const conIncremento = base + montoIncremento;
+
   const costoColocacionUnit = item.colocacion ? area * (Number(config.placaColocacionM2) || 0) : 0;
   const costoEnvioUnit = item.envio ? Number(config.placaEnvioFijo) || 0 : 0;
-  const contadoUnit = base + costoColocacionUnit + costoEnvioUnit;
+  const contadoUnit = conIncremento + costoColocacionUnit + costoEnvioUnit;
 
   const fijado = item.precioFijado != null && Number.isFinite(Number(item.precioFijado));
   const precioUnitario = fijado
@@ -460,15 +477,17 @@ function calcularItemPlaca(item, config) {
 
   const costoPropio = item.costoFijado != null && Number.isFinite(Number(item.costoFijado))
     ? (Number(item.costoFijado) + costoColocacionUnit + costoEnvioUnit) * cantidad
-    : contadoUnit * cantidad;
+    : (base + costoColocacionUnit + costoEnvioUnit) * cantidad;
 
   return {
     fijado,
     m2Real: area,
     m2: area,
     aplicaMinimo: false,
-    anchoM,
-    altoM,
+    // Una placa se cotiza por superficie, no por ancho × alto: los dejamos en
+    // cero para que se note si alguna pantalla los muestra sin querer.
+    anchoM: 0,
+    altoM: 0,
     cantidad,
     precioTela: precioM2,
     sistemaKey: null,
@@ -477,9 +496,9 @@ function calcularItemPlaca(item, config) {
     costoTela: base,
     costoSistema: 0,
     base,
-    incrementoPct: 0,
-    montoIncremento: 0,
-    conIncremento: base,
+    incrementoPct,
+    montoIncremento,
+    conIncremento,
     precioUnitario,
     total: precioUnitario * cantidad,
     // Colocación reusa el mismo casillero que la instalación de una cortina:

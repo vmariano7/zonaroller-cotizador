@@ -7,6 +7,17 @@ import { esc, aviso, confirmar, descargarArchivo, fecha, plata, modal } from '..
 import { PLANTILLA_POR_DEFECTO, CLAVES } from '../mensaje.js';
 import { tienePin, definirPin } from '../candado.js';
 
+/**
+ * Qué artículos llevan porcentaje de ganancia. Los cuatro tipos de cortina
+ * salen de TIPOS; placas y adicionales tienen su propio catálogo, así que van
+ * a mano. La clave es la misma que usa `config.incrementos`.
+ */
+const ARTICULOS_INCREMENTO = [
+  ...Object.entries(TIPOS).map(([tipo, def]) => [tipo, def.nombre]),
+  ['placa', 'Placas'],
+  ['adicional', 'Adicionales'],
+];
+
 let temporizador;
 function guardarPronto(parcial) {
   clearTimeout(temporizador);
@@ -171,7 +182,7 @@ export function render(contenedor) {
             <span class="seccion-num">05</span>
             <div><h2>Incrementos</h2><div class="mini">Activá y definí el porcentaje por artículo.</div></div>
           </div>
-          ${Object.entries(TIPOS).map(([tipo, def]) => {
+          ${ARTICULOS_INCREMENTO.map(([tipo, nombre]) => {
             const inc = c.incrementos?.[tipo] || { activo: true, valor: 0 };
             return `
             <div class="campo" style="display:flex;align-items:center;gap:.6rem">
@@ -179,7 +190,7 @@ export function render(contenedor) {
                 <input type="checkbox" data-inc-activo="${tipo}"${inc.activo ? ' checked' : ''}>
                 <span class="switch__pista"></span>
               </label>
-              <span style="flex:1;font-weight:600">${esc(def.nombre)}</span>
+              <span style="flex:1;font-weight:600">${esc(nombre)}</span>
               <div class="con-sufijo" style="width:100px">
                 <input type="number" inputmode="decimal" min="0" step="1" data-inc-valor="${tipo}" value="${inc.valor ?? 0}"><span>%</span>
               </div>
@@ -187,8 +198,9 @@ export function render(contenedor) {
           }).join('')}
           <div class="banner banner--info" style="margin:1rem 0 0">
             <div>En Roller, Verticales y Zebra el incremento se calcula sobre tela y sistema.
-            En Tela Tradicional se calcula sobre la fórmula fija del renglón de arriba.
-            En todos los casos la instalación se suma después, sin incremento.</div>
+            En Tela Tradicional, sobre la fórmula fija del renglón de arriba. En Placas, sobre el
+            precio por m² del producto, y en Adicionales sobre el precio de cada unidad.
+            La instalación, la colocación y el envío se suman después, sin incremento.</div>
           </div>
         </div>
 

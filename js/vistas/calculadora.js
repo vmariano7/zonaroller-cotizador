@@ -7,7 +7,7 @@
 // mandarlo por WhatsApp si hace falta).
 
 import { estado } from '../store.js';
-import { el, esc, plata, aviso } from '../ui.js';
+import { el, esc, plata, num, aviso } from '../ui.js';
 import { copiar } from '../mensaje.js';
 
 const TITULOS = {
@@ -54,13 +54,19 @@ export function render(contenedor, { categoria }) {
 
   let lineas = [{ id: crypto.randomUUID(), productoId: catalogo[0].id, cantidad: 1 }];
 
+  // El porcentaje de ganancia sale de Ajustes → Incrementos, igual que el de
+  // las cortinas. La clave va en singular: "adicional", "placa".
+  const reglaInc = estado.config.incrementos?.[categoria === 'placas' ? 'placa' : 'adicional'] || { activo: false, valor: 0 };
+  const pctIncremento = reglaInc.activo ? Number(reglaInc.valor) || 0 : 0;
+  const conIncremento = (precio) => (Number(precio) || 0) * (1 + pctIncremento / 100);
+
   function nodoLinea(linea, indice) {
     const nodo = el(`
       <div class="cortina" data-id="${linea.id}">
         <div class="cortina__cab">
           <span class="cortina__n">${String(indice + 1).padStart(2, '0')}</span>
           <select data-campo="productoId" style="flex:1">
-            ${catalogo.map((p) => `<option value="${esc(p.id)}"${p.id === linea.productoId ? ' selected' : ''}>${esc(p.nombre)} — ${plata(p.precio)}</option>`).join('')}
+            ${catalogo.map((p) => `<option value="${esc(p.id)}"${p.id === linea.productoId ? ' selected' : ''}>${esc(p.nombre)} — ${plata(conIncremento(p.precio))}</option>`).join('')}
           </select>
           <button class="btn-icono" data-quitar title="Quitar línea">&#10005;</button>
         </div>
@@ -100,13 +106,14 @@ export function render(contenedor, { categoria }) {
     const producto = catalogo.find((p) => p.id === linea.productoId);
     const precio = Number(producto?.precio) || 0;
     const cantidad = Math.max(1, Number(linea.cantidad) || 1);
-    return { producto, precio, cantidad, subtotal: precio * cantidad };
+    const unitario = conIncremento(precio);
+    return { producto, precio, pct: pctIncremento, unitario, cantidad, subtotal: unitario * cantidad };
   }
 
   function pintarResumenLinea(nodo, linea) {
-    const { precio, cantidad, subtotal } = subtotalLinea(linea);
+    const { pct, unitario, cantidad, subtotal } = subtotalLinea(linea);
     nodo.querySelector('[data-resumen]').innerHTML = `
-      <span>${cantidad} × ${plata(precio)}</span>
+      <span>${cantidad} × ${plata(unitario)}${pct ? ` <span class="mini">(+${num(pct, 0)}%)</span>` : ''}</span>
       <span class="cortina__precio">${plata(subtotal)}</span>
     `;
   }

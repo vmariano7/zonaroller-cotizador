@@ -10,6 +10,7 @@
   --fondo-2: #f7f8f9;
   --fondo-3: #eef0f2;
   --acento: #b4531f;
+  --acento-fondo: #f8ece4;
   --verde: #14794b;
   --verde-fondo: #e7f4ee;
   --rojo: #b3261e;
@@ -325,20 +326,49 @@ tbody tr:hover { background: var(--fondo-2); }
 }
 .tipo[aria-pressed="true"] .tipo__icono { color: var(--tinta); }
 
-/* Elegir la categoría al entrar al cotizador: Cortinas / Placas / Adicionales. */
-.categorias { display: grid; grid-template-columns: 1fr; gap: .75rem; }
-@media (min-width: 620px) { .categorias { grid-template-columns: repeat(3, 1fr); } }
+/* Elegir la categoría al entrar al cotizador: Cortinas / Placas / Adicionales.
+   En el celular son tres filas (ícono, texto y flecha); en la compu, tres
+   tarjetas con el ícono arriba y el texto abajo. */
+.categorias { display: grid; gap: .55rem; }
+@media (min-width: 760px) { .categorias { grid-template-columns: repeat(3, 1fr); gap: .8rem; } }
+
 .categoria {
-  display: flex; flex-direction: column; align-items: flex-start; gap: .5rem;
-  padding: 1.4rem 1.2rem; border-radius: var(--radio);
-  border: 1px solid var(--linea); background: var(--fondo); cursor: pointer;
-  text-decoration: none; color: inherit;
-  transition: border-color .12s, box-shadow .12s, transform .12s;
+  position: relative;
+  display: flex; align-items: center; gap: .85rem;
+  padding: .95rem 1rem;
+  border: 1px solid var(--linea); border-radius: 14px;
+  background: var(--fondo); color: inherit; text-decoration: none;
+  transition: border-color .15s, box-shadow .15s, transform .15s;
 }
-.categoria:hover { border-color: var(--linea-fuerte); box-shadow: var(--sombra); transform: translateY(-1px); }
-.categoria__icono { width: 32px; height: 32px; color: var(--acento); display: block; }
-.categoria__nombre { font-size: 1.05rem; font-weight: 700; }
-.categoria__desc { font-size: .8rem; color: var(--tinta-3); }
+.categoria:hover, .categoria:focus-visible {
+  border-color: var(--linea-fuerte); box-shadow: var(--sombra); transform: translateY(-1px);
+}
+@media (min-width: 760px) {
+  .categoria { flex-direction: column; align-items: flex-start; gap: .8rem; padding: 1.5rem 1.3rem; min-height: 168px; }
+}
+
+.categoria__chip {
+  width: 46px; height: 46px; flex: none; border-radius: 13px;
+  display: grid; place-items: center;
+  background: var(--acento-fondo); color: var(--acento);
+  transition: background .15s, color .15s;
+}
+.categoria:hover .categoria__chip { background: var(--acento); color: #fff; }
+.categoria__chip svg { width: 24px; height: 24px; display: block; }
+
+.categoria__texto { display: flex; flex-direction: column; gap: .12rem; min-width: 0; }
+@media (min-width: 760px) { .categoria__texto { margin-top: auto; } }
+.categoria__nombre { font-weight: 700; font-size: 1rem; letter-spacing: -.01em; }
+.categoria__desc { font-size: .76rem; color: var(--tinta-3); line-height: 1.35; }
+
+.categoria__flecha {
+  width: 8px; height: 12px; flex: none; margin-left: auto;
+  color: var(--tinta-3); transition: color .15s;
+}
+.categoria:hover .categoria__flecha { color: var(--tinta); }
+@media (min-width: 760px) {
+  .categoria__flecha { position: absolute; top: 1.6rem; right: 1.3rem; margin: 0; }
+}
 
 .avanzadas > summary {
   cursor: pointer; font-size: .78rem; font-weight: 600; color: var(--tinta-2);
