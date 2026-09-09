@@ -6,6 +6,7 @@ import { estado } from './store.js';
 import { calcularTotales, descripcionItem, detallesTecnicos, NOMBRE_TIPO } from './calc.js';
 import { plata, num, fecha, esc, sumarDias, ajuste, medidaTexto } from './ui.js';
 import { datosContado } from './mensaje.js';
+import { totalPedido, cobrado, saldo, venta } from './dinero.js';
 
 // La financiación que se ofrece hoy. Va en el pie del presupuesto, debajo de
 // la forma de pago, para que quede claro que las cuotas son sobre el precio
@@ -133,7 +134,13 @@ export function imprimirPresupuesto(p) {
 export function imprimirOrdenTrabajo(p) {
   const emp = estado.config.empresa || {};
   const t = calcularTotales(p.items, estado.config, { descuentoPct: p.descuentoPct });
-  const pagado = (p.pagos || []).reduce((a, g) => a + (Number(g.monto) || 0), 0);
+  // La cobranza sale de lo que se cerró con el cliente, no de recalcular los
+  // renglones: si el pedido se cobra de contado (o se redondeó a mano), el
+  // total de lista deja un saldo que no es el que hay que cobrar.
+  const v = venta(p);
+  const comoSeCobra = v.acordado != null
+    ? 'precio acordado'
+    : v.modo === 'contado' ? `contado, −${num(v.pct, 1)}%` : '';
 
   const html = `
     ${encabezado(emp)}
@@ -152,9 +159,9 @@ export function imprimirOrdenTrabajo(p) {
       </div>
       <div class="hoja__bloque">
         <h4>Cobranza</h4>
-        Total ${plata(t.total)}<br>
-        Pagado ${plata(pagado)}<br>
-        <strong>Saldo ${plata(t.total - pagado)}</strong>
+        Total ${plata(totalPedido(p))}${comoSeCobra ? ` <span style="font-size:8pt">(${esc(comoSeCobra)})</span>` : ''}<br>
+        Pagado ${plata(cobrado(p))}<br>
+        <strong>Saldo ${plata(saldo(p))}</strong>
       </div>
     </div>
 
