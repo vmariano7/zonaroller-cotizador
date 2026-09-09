@@ -7,6 +7,11 @@ import { calcularTotales, descripcionItem, detallesTecnicos, NOMBRE_TIPO } from 
 import { plata, num, fecha, esc, sumarDias, ajuste, medidaTexto } from './ui.js';
 import { datosContado } from './mensaje.js';
 
+// La financiación que se ofrece hoy. Va en el pie del presupuesto, debajo de
+// la forma de pago, para que quede claro que las cuotas son sobre el precio
+// de lista y no sobre el de contado (que ya viene con su descuento).
+const FINANCIACION = 'El precio de lista se puede abonar en 12 cuotas sin interés con cualquier tarjeta de crédito.';
+
 export function montarHoja(html, tituloVentana, claseExtra = '') {
   document.querySelectorAll('.hoja').forEach((n) => n.remove());
   const hoja = document.createElement('div');
@@ -115,6 +120,7 @@ export function imprimirPresupuesto(p) {
     <div class="hoja__pie">
       ${p.notas ? `<p><strong>Observaciones:</strong> ${esc(p.notas)}</p>` : ''}
       ${emp.formaPago ? `<p><strong>Forma de pago:</strong> ${esc(emp.formaPago)}</p>` : ''}
+      <p><strong>Financiación:</strong> ${esc(FINANCIACION)}</p>
       <p>Los precios incluyen la confección a medida y la colocación indicada en cada renglón.
       Las medidas fueron tomadas según lo informado por el cliente; cualquier diferencia puede modificar el valor final.</p>
       <p style="margin-top:8px">¡Gracias por elegir ${esc(emp.nombre || 'Zona Roller')}!</p>
