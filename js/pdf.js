@@ -3,11 +3,9 @@
 // En la compu: destino "Guardar como PDF".
 
 import { estado } from './store.js';
-import { calcularTotales, descripcionItem, detallesTecnicos } from './calc.js';
+import { calcularTotales, descripcionItem, detallesTecnicos, NOMBRE_TIPO } from './calc.js';
 import { plata, num, fecha, esc, sumarDias, ajuste, medidaTexto } from './ui.js';
 import { datosContado } from './mensaje.js';
-
-const NOMBRE_TIPO = { roller: 'Roller', vertical: 'Bandas verticales', zebra: 'Zebra', tela_tradicional: 'Cortina Tela Tradicional', placa: 'Placa', adicional: 'Adicional' };
 
 export function montarHoja(html, tituloVentana, claseExtra = '') {
   document.querySelectorAll('.hoja').forEach((n) => n.remove());

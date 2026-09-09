@@ -1,7 +1,7 @@
 // Pedidos confirmados: listado, alta desde cero o desde presupuesto, y detalle con pagos.
 
 import { estado, guardar, borrar, obtener, proximoNumero } from '../store.js';
-import { calcularTotales, descripcionItem, detallesTecnicos, CATEGORIA, categoriaDoc, contarItems } from '../calc.js';
+import { calcularTotales, descripcionItem, detallesTecnicos, CATEGORIA, categoriaDoc, contarItems, NOMBRE_TIPO } from '../calc.js';
 import {
   plata, num, fecha, esc, aviso, confirmar, chip, vacio, modal, hoyISO, leerNumero, ESTADOS_PEDIDO, medidaTexto,
 } from '../ui.js';
@@ -479,7 +479,7 @@ export function renderDetalle(contenedor, params) {
             ${t.lineas.map(({ item, calc }) => `
               <tr>
                 <td>${esc(item.ambiente || '—')}${armado(item) ? `<div class="mini">${esc(armado(item))}</div>` : ''}</td>
-                <td>${esc({ roller: 'Roller', vertical: 'Bandas verticales', zebra: 'Zebra', tela_tradicional: 'Cortina Tela Tradicional', placa: 'Placa', adicional: 'Adicional' }[item.tipo] || item.tipo)}<div class="mini">${esc(descripcionItem(item) || item.tela)}</div></td>
+                <td>${esc(NOMBRE_TIPO[item.tipo] || item.tipo)}<div class="mini">${esc(descripcionItem(item) || item.tela)}</div></td>
                 <td class="num">${medidaTexto(item, calc)}</td>
                 <td class="num mini">${esc(calc.sistemaNombre)}</td>
                 <td class="num">${calc.cantidad}</td>

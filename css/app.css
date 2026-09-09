@@ -308,7 +308,8 @@ tbody tr:hover { background: var(--fondo-2); }
 
 /* Elegir el tipo de cortina: tarjetas, no una lista desplegable. */
 .tipos { display: grid; grid-template-columns: repeat(2, 1fr); gap: .5rem; }
-@media (min-width: 620px) { .tipos { grid-template-columns: repeat(4, 1fr); } }
+@media (min-width: 620px) { .tipos { grid-template-columns: repeat(3, 1fr); } }
+@media (min-width: 940px) { .tipos { grid-template-columns: repeat(5, 1fr); } }
 .tipo {
   display: flex; align-items: center; justify-content: center; gap: .5rem;
   font: inherit; font-size: .85rem; font-weight: 600; color: var(--tinta-2);

@@ -85,6 +85,11 @@ const ICONOS = {
     <rect x="3.5" y="3" width="17" height="2.5" rx="1" fill="currentColor" stroke="none"/>
     <rect x="4.5" y="5.5" width="15" height="15" rx=".5"/>
     <path d="M4.5 8h15M4.5 13h15M4.5 18h15" stroke-width="2.6" opacity=".3"/></svg>`,
+  panel_oriental: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round">
+    <rect x="2.5" y="3" width="19" height="2.5" rx="1" fill="currentColor" stroke="none"/>
+    <rect x="3.5" y="6.5" width="5.5" height="14" rx=".5"/>
+    <rect x="9.25" y="6.5" width="5.5" height="14" rx=".5"/>
+    <rect x="15" y="6.5" width="5.5" height="14" rx=".5"/></svg>`,
   tela_tradicional: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round">
     <path d="M2.5 4h19" stroke-width="1.8"/>
     <path d="M4.5 4v14.5c.9 0 .9 2 1.8 2s.9-2 1.8-2 .9 2 1.8 2V4"/>

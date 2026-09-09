@@ -2,7 +2,7 @@
 // sincronización con la nube y respaldos.
 
 import { estado, guardarConfig, cerrarSesion, sincronizar, exportarRespaldo, importarRespaldo } from '../store.js';
-import { TIPOS, SISTEMAS, CATEGORIA } from '../calc.js';
+import { TIPOS, CATEGORIA, sistemasDeConfig, usaSistemaBasico } from '../calc.js';
 import { esc, aviso, confirmar, descargarArchivo, fecha, plata, modal } from '../ui.js';
 import { plantillaDe, CLAVES } from '../mensaje.js';
 import { tienePin, definirPin } from '../candado.js';
@@ -124,7 +124,7 @@ export function render(contenedor) {
         <div style="display:flex;justify-content:flex-end;margin-bottom:.4rem">
           <button class="btn btn--chico btn--fantasma" data-gestionar-sistemas style="font-size:.7rem;padding:.3rem .6rem">Agregar / renombrar / borrar</button>
         </div>
-        ${(c.catalogoSistemas || Object.entries(SISTEMAS).map(([id, nombre]) => ({ id, nombre }))).map(({ id: clave, nombre }) => `
+        ${sistemasDeConfig(c).map(({ id: clave, nombre }) => `
           <div class="campo" style="display:flex;align-items:center;gap:.6rem">
             <label style="flex:1;margin:0;font-weight:500">${esc(nombre)}</label>
             <div class="con-prefijo" style="width:140px"><span>$</span>
@@ -145,6 +145,12 @@ export function render(contenedor) {
           <label style="flex:1;margin:0;font-weight:500;color:var(--acento)">Bandas verticales y Tela tradicional</label>
           <div class="con-prefijo" style="width:140px"><span>$</span>
             <input type="number" inputmode="decimal" min="0" step="1" data-inst="vertical" value="${c.instalador?.vertical ?? 20000}">
+          </div>
+        </div>
+        <div class="campo" style="display:flex;align-items:center;gap:.6rem">
+          <label style="flex:1;margin:0;font-weight:500;color:var(--acento)">Paneles orientales</label>
+          <div class="con-prefijo" style="width:140px"><span>$</span>
+            <input type="number" inputmode="decimal" min="0" step="1" data-inst="panel_oriental" value="${c.instalador?.panel_oriental ?? 0}">
           </div>
         </div>
         <div class="campo" style="display:flex;align-items:center;gap:.6rem">
@@ -558,7 +564,9 @@ function dialogoTelas(tipo, alGuardar) {
   const nombresOriginales = estado.config.catalogoTelas?.[tipo] || TIPOS[tipo].telas;
   const precios = estado.config.telas?.[tipo] || {};
   const basicas = new Set(estado.config.telasSistemaBasico || []);
-  const conSistema = tipo !== 'zebra';
+  // Sólo roller y verticales eligen sistema según la tela; zebra y paneles
+  // orientales tienen uno solo, así que ahí el tilde no tendría sentido.
+  const conSistema = usaSistemaBasico(tipo);
 
   let lista = nombresOriginales.map((n) => ({ nombre: n, precio: Number(precios[n]) || 0, basico: basicas.has(n) }));
   if (!lista.length) lista.push({ nombre: '', precio: 0, basico: false });

@@ -7,14 +7,22 @@
 // pasa por el mismo incremento e igual conversión a contado/lista.
 // Ningún lado se cobra por debajo del metro: ver MINIMO_LADO_M.
 
+// Las telas de siempre: roller, verticales y paneles orientales se hacen con
+// las mismas. Son sólo el punto de partida — la lista se edita en Ajustes.
+const TELAS_COMUNES = ['Blackout', 'Sunscreen 5%', 'Sunscreen 1%', 'South Beach', 'Shangtung', 'Córdoba', 'Blackout decorativo'];
+
 export const TIPOS = {
   roller: {
     nombre: 'Roller',
-    telas: ['Blackout', 'Sunscreen 5%', 'Sunscreen 1%', 'South Beach', 'Shangtung', 'Córdoba', 'Blackout decorativo'],
+    telas: [...TELAS_COMUNES],
   },
   vertical: {
     nombre: 'Bandas verticales',
-    telas: ['Blackout', 'Sunscreen 5%', 'Sunscreen 1%', 'South Beach', 'Shangtung', 'Córdoba', 'Blackout decorativo'],
+    telas: [...TELAS_COMUNES],
+  },
+  panel_oriental: {
+    nombre: 'Paneles orientales',
+    telas: [...TELAS_COMUNES],
   },
   zebra: {
     nombre: 'Zebra',
@@ -36,6 +44,31 @@ export const SISTEMAS = {
   vertical_basico: 'Vertical · Blackout / Sunscreen 5%',
   vertical_demas: 'Vertical · Demás telas',
   zebra: 'Sistema Zebra',
+  panel_oriental: 'Sistema Paneles Orientales',
+};
+
+/**
+ * Los sistemas que hay para elegir en Ajustes: los guardados más los que el
+ * cálculo puede asignar solo y todavía no estén en la lista. Sin esto, un
+ * sistema nuevo (como el de paneles orientales) no aparecería nunca en un
+ * config que se guardó antes de que existiera.
+ */
+export function sistemasDeConfig(config) {
+  const guardados = config?.catalogoSistemas || [];
+  const faltantes = Object.entries(SISTEMAS)
+    .filter(([id]) => !guardados.some((s) => s.id === id))
+    .map(([id, nombre]) => ({ id, nombre, protegido: true }));
+  return [...guardados, ...faltantes];
+}
+
+/**
+ * Cómo se llama cada tipo de renglón en pantalla y en los PDF. Sale de TIPOS
+ * para que agregar un tipo de cortina alcance con tocar un solo lugar.
+ */
+export const NOMBRE_TIPO = {
+  ...Object.fromEntries(Object.entries(TIPOS).map(([clave, def]) => [clave, def.nombre])),
+  placa: 'Placa',
+  adicional: 'Adicional',
 };
 
 /**
@@ -77,13 +110,16 @@ export const ARMADO = {
 
 /**
  * Qué se elige en cada tipo. Las bandas verticales no llevan cadena, caída ni
- * caño: se recogen hacia un lado, así que van comando y recogimiento.
- * La tela tradicional tiene los suyos propios (paños, pliegue, recogimiento).
+ * caño: se recogen hacia un lado, así que van comando y recogimiento. Los
+ * paneles orientales corren de la misma manera, sobre riel, así que llevan lo
+ * mismo. La tela tradicional tiene los suyos propios (paños, pliegue,
+ * recogimiento).
  */
 export const ARMADO_POR_TIPO = {
   roller: ['comando', 'cadena', 'caida', 'sistemaCano'],
   zebra: ['comando', 'cadena', 'caida', 'sistemaCano'],
   vertical: ['comando', 'recogimientoVertical'],
+  panel_oriental: ['comando', 'recogimientoVertical'],
   tela_tradicional: [],
 };
 
@@ -98,18 +134,20 @@ export function configVacia() {
     catalogoTelas: {
       roller: [...TIPOS.roller.telas],
       vertical: [...TIPOS.vertical.telas],
+      panel_oriental: [...TIPOS.panel_oriental.telas],
       zebra: [...TIPOS.zebra.telas],
     },
     telas: {
       roller: cero(TIPOS.roller.telas),
       vertical: cero(TIPOS.vertical.telas),
+      panel_oriental: cero(TIPOS.panel_oriental.telas),
       zebra: cero(TIPOS.zebra.telas),
     },
     // Catálogo de sistemas: igual que las telas, editable desde Ajustes.
-    // `protegido` son los 5 que arma el cálculo automático (ver sistemaAuto);
+    // `protegido` son los que arma el cálculo automático (ver sistemaAuto);
     // se pueden renombrar o borrar igual, pero Ajustes avisa antes de borrarlos.
     catalogoSistemas: Object.entries(SISTEMAS).map(([id, nombre]) => ({ id, nombre, protegido: true })),
-    sistemas: { roller_basico: 0, roller_demas: 0, vertical_basico: 0, vertical_demas: 0, zebra: 0 },
+    sistemas: { roller_basico: 0, roller_demas: 0, vertical_basico: 0, vertical_demas: 0, zebra: 0, panel_oriental: 0 },
     // Telas que usan el sistema "básico" (más económico) en roller y vertical.
     telasSistemaBasico: ['Blackout', 'Sunscreen 5%'],
     // Placas y adicionales: catálogos de productos simples (nombre + precio)
@@ -126,6 +164,7 @@ export function configVacia() {
     incrementos: {
       roller: { activo: true, valor: 0 },
       vertical: { activo: true, valor: 0 },
+      panel_oriental: { activo: true, valor: 0 },
       zebra: { activo: true, valor: 0 },
       tela_tradicional: { activo: true, valor: 0 },
       placa: { activo: true, valor: 0 },
@@ -133,7 +172,7 @@ export function configVacia() {
     },
     // Lo que te sale el instalador. Se traslada al precio final de la cortina:
     // al cliente no se le cobra aparte, ya viene adentro. Ver costoInstaladorItem.
-    instalador: { roller: 15000, vertical: 20000, recargoPct: 50 },
+    instalador: { roller: 15000, vertical: 20000, panel_oriental: 0, recargoPct: 50 },
     // Lo que te sale el motor de una roller automatizada. Va a precio de costo,
     // sin incremento: se suma después de la ganancia, igual que la instalación.
     // El importe real se carga en Ajustes, no vive en el código.
@@ -317,8 +356,18 @@ const MINIMO_LADO_M = 1;
 
 const ladoCobrado = (metros) => Math.max(MINIMO_LADO_M, Number(metros) || 0);
 
-/** Tipos que llevan la tarifa de instalación más cara. */
-const INSTALACION_CARA = ['vertical', 'tela_tradicional'];
+/**
+ * Con qué tarifa de instalación se cobra cada tipo. Roller y zebra van con la
+ * misma; verticales y tela tradicional comparten la más cara; los paneles
+ * orientales tienen la suya. Lo que no esté acá usa la de roller.
+ */
+const TARIFA_INSTALADOR = {
+  roller: 'roller',
+  zebra: 'roller',
+  vertical: 'vertical',
+  tela_tradicional: 'vertical',
+  panel_oriental: 'panel_oriental',
+};
 
 /** Solo las roller se automatizan. */
 export function admiteMotor(tipo) {
@@ -355,16 +404,23 @@ export function anchoEnMetros(item) {
 export function costoInstaladorItem(item, config, { cortinasTotales = 1 } = {}) {
   if (!item.instalacion) return 0;
   const tarifas = config.instalador || {};
-  const base = INSTALACION_CARA.includes(item.tipo)
-    ? Number(tarifas.vertical) || 0
-    : Number(tarifas.roller) || 0;
+  const base = Number(tarifas[TARIFA_INSTALADOR[item.tipo] || 'roller']) || 0;
   const conRecargo = cortinasTotales <= 1 || anchoEnMetros(item) > ANCHO_RECARGO_M;
   return conRecargo ? base * (1 + (Number(tarifas.recargoPct) || 0) / 100) : base;
 }
 
+/**
+ * Tipos cuyo sistema se elige según la tela: los que están en
+ * `telasSistemaBasico` usan el económico y el resto el de "demás telas".
+ * Zebra y paneles orientales tienen un solo sistema, así que no se dividen.
+ */
+export function usaSistemaBasico(tipo) {
+  return tipo === 'roller' || tipo === 'vertical';
+}
+
 /** Sistema que corresponde automáticamente a un tipo + tela. */
 export function sistemaAuto(tipo, tela, config) {
-  if (tipo === 'zebra') return 'zebra';
+  if (!usaSistemaBasico(tipo)) return tipo;
   const basicas = config.telasSistemaBasico || [];
   const sufijo = basicas.includes(tela) ? 'basico' : 'demas';
   return `${tipo}_${sufijo}`;
