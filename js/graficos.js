@@ -61,7 +61,11 @@ function ocultarGlobo() {
 
 /**
  * @param {HTMLElement} contenedor
- * @param {{etiquetas: string[], series: {nombre: string, valores: number[]}[], formato?: Function}} datos
+ * Cada serie puede traer su propio `color`: sirve cuando la lista se filtra
+ * (por ejemplo, se esconde lo que no vendiste) y el color tiene que seguir
+ * siendo el mismo para lo mismo, sin depender de en qué posición quedó.
+ *
+ * @param {{etiquetas: string[], series: {nombre: string, valores: number[], color?: string}[], formato?: Function}} datos
  */
 export function columnasApiladas(contenedor, { etiquetas, series, formato = plata, titulo = '' }) {
   const W = 720;
@@ -102,7 +106,7 @@ export function columnasApiladas(contenedor, { etiquetas, series, formato = plat
           const esUltimo = series.slice(si + 1).every((o) => (o.valores[i] || 0) <= 0);
           const alto = Math.max(1, y0 - y1 - (esUltimo ? 0 : 2));
           const r = esUltimo ? Math.min(4, alto / 2, anchoBarra / 2) : 0;
-          return `<path d="M${x},${y1 + alto} L${x},${y1 + r} Q${x},${y1} ${x + r},${y1} L${x + anchoBarra - r},${y1} Q${x + anchoBarra},${y1} ${x + anchoBarra},${y1 + r} L${x + anchoBarra},${y1 + alto} Z" fill="${SERIES[si % SERIES.length]}"/>`;
+          return `<path d="M${x},${y1 + alto} L${x},${y1 + r} Q${x},${y1} ${x + r},${y1} L${x + anchoBarra - r},${y1} Q${x + anchoBarra},${y1} ${x + anchoBarra},${y1 + r} L${x + anchoBarra},${y1 + alto} Z" fill="${s.color || SERIES[si % SERIES.length]}"/>`;
         })
         .join('');
 
@@ -122,7 +126,7 @@ export function columnasApiladas(contenedor, { etiquetas, series, formato = plat
       </svg>
     </div>
     <div class="leyenda">
-      ${series.map((s, i) => `<span class="leyenda__item"><span class="leyenda__punto" style="background:${SERIES[i % SERIES.length]}"></span>${esc(s.nombre)}</span>`).join('')}
+      ${series.map((s, i) => `<span class="leyenda__item"><span class="leyenda__punto" style="background:${s.color || SERIES[i % SERIES.length]}"></span>${esc(s.nombre)}</span>`).join('')}
     </div>`;
 
   const svg = contenedor.querySelector('svg');
@@ -137,7 +141,7 @@ export function columnasApiladas(contenedor, { etiquetas, series, formato = plat
       resalte.setAttribute('height', altoUtil);
 
       const filas = series
-        .map((s, si) => ({ nombre: s.nombre, valor: s.valores[i] || 0, color: SERIES[si % SERIES.length] }))
+        .map((s, si) => ({ nombre: s.nombre, valor: s.valores[i] || 0, color: s.color || SERIES[si % SERIES.length] }))
         .filter((f) => f.valor > 0);
 
       const caja = svg.getBoundingClientRect();

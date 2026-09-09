@@ -1,15 +1,18 @@
 // Reportes: cómo vienen las ventas, qué se vende y cuánto se convierte.
 
 import { estado } from '../store.js';
-import { calcularTotales, TIPOS } from '../calc.js';
+import { calcularTotales, NOMBRE_TIPO, CATEGORIA, categoriaItem, materialItem, contarItems, frasearUnidades } from '../calc.js';
 import { plata, num, esc, hoyISO, capitalizar } from '../ui.js';
 import { navegar } from '../router.js';
 import { columnasApiladas, barrasHorizontales, tablaDeSeries, SERIES } from '../graficos.js';
 import { totalPedido, cobrado, costos, margen } from '../dinero.js';
 import { claveCliente } from './clientes.js';
 
-const NOMBRE_TIPO = { roller: 'Roller', vertical: 'Bandas verticales', zebra: 'Zebra', tela_tradicional: 'Tela Tradicional' };
-const ORDEN_TIPOS = ['roller', 'vertical', 'zebra', 'tela_tradicional'];
+// Las columnas del gráfico de meses se dividen en cortinas, placas y
+// adicionales: tres tandas que se distinguen bien de un vistazo. El detalle
+// de qué tipo de cortina se vendió va aparte, en el ranking de abajo, donde
+// cada barra lleva su nombre escrito y no hay que adivinar por color.
+const ORDEN_CATEGORIAS = Object.keys(CATEGORIA);
 
 const mesDe = (iso) => String(iso || '').slice(0, 7);
 
@@ -48,23 +51,31 @@ function desglose(pedido) {
   const base = t.subtotal || 1;
   const factor = total / base;
 
-  const porTipo = { roller: 0, vertical: 0, zebra: 0, tela_tradicional: 0 };
-  const porTela = {};
-  let cortinas = 0;
+  // Tres cortes de lo mismo: por categoría (para el gráfico de meses), por
+  // tipo y por tela o producto (para los rankings). Nada queda afuera: todo
+  // renglón cae en alguna categoría, sea cortina, placa o adicional.
+  const porCategoria = {};
+  const unidades = {};
+  const porTipo = {};
+  const unidadesTipo = {};
+  const porMaterial = {};
 
   t.lineas.forEach(({ item, calc }) => {
     const monto = calc.total * factor;
-    if (porTipo[item.tipo] !== undefined) porTipo[item.tipo] += monto;
-    const clave = `${NOMBRE_TIPO[item.tipo] || item.tipo} · ${item.tela}`;
-    porTela[clave] = (porTela[clave] || 0) + monto;
-    cortinas += calc.cantidad;
+    const cat = categoriaItem(item);
+    porCategoria[cat] = (porCategoria[cat] || 0) + monto;
+    unidades[cat] = (unidades[cat] || 0) + calc.cantidad;
+    porTipo[item.tipo] = (porTipo[item.tipo] || 0) + monto;
+    unidadesTipo[item.tipo] = (unidadesTipo[item.tipo] || 0) + calc.cantidad;
+    const clave = `${NOMBRE_TIPO[item.tipo] || item.tipo} · ${materialItem(item)}`;
+    porMaterial[clave] = (porMaterial[clave] || 0) + monto;
   });
 
   // La ganancia sale del total realmente cobrado menos el costo real, que es
   // lo mismo que muestra la ficha del pedido. No se recalcula desde los
   // renglones: un pedido cobrado de contado vale menos que su precio de lista,
   // y esa diferencia no es ganancia.
-  return { total, porTipo, porTela, cortinas, ganancia: margen(pedido) };
+  return { total, porCategoria, unidades, porTipo, unidadesTipo, porMaterial, ganancia: margen(pedido) };
 }
 
 /**
@@ -128,31 +139,55 @@ export function render(contenedor) {
     const desgloses = pedidos.map((p) => ({ pedido: p, d: desglose(p) }));
 
     const vendido = desgloses.reduce((a, x) => a + x.d.total, 0);
-    const cortinas = desgloses.reduce((a, x) => a + x.d.cortinas, 0);
+    const unidades = {};
+    desgloses.forEach((x) => ORDEN_CATEGORIAS.forEach((cat) => {
+      unidades[cat] = (unidades[cat] || 0) + (x.d.unidades[cat] || 0);
+    }));
     const ganancia = desgloses.reduce((a, x) => a + x.d.ganancia, 0);
     const ticket = pedidos.length ? vendido / pedidos.length : 0;
     const margenPct = vendido ? (ganancia / vendido) * 100 : 0;
 
     const presupuestos = estado.presupuestos.filter((p) => enRango(p.fecha));
 
-    // Serie mensual apilada por tipo
-    const series = ORDEN_TIPOS.map((tipo) => ({
-      nombre: NOMBRE_TIPO[tipo],
-      valores: meses.map((m) =>
-        desgloses
-          .filter((x) => mesDe(x.pedido.fecha) === m)
-          .reduce((a, x) => a + (metrica === 'plata' ? x.d.porTipo[tipo] : contarCortinas(x, tipo)), 0)
-      ),
-    }));
+    // Serie mensual apilada por categoría. El color va pegado a la categoría y
+    // no a la posición, así que esconder una tanda vacía no repinta a las otras.
+    const series = ORDEN_CATEGORIAS
+      .map((cat, i) => ({
+        nombre: CATEGORIA[cat].titulo,
+        color: SERIES[i % SERIES.length],
+        valores: meses.map((m) =>
+          desgloses
+            .filter((x) => mesDe(x.pedido.fecha) === m)
+            .reduce((a, x) => a + (metrica === 'plata' ? x.d.porCategoria[cat] || 0 : x.d.unidades[cat] || 0), 0)
+        ),
+      }))
+      .filter((s) => s.valores.some((v) => v));
 
-    // Ranking de telas
-    const telas = {};
+    // Ranking por tipo: acá aparece el detalle de las cortinas (roller,
+    // verticales, paneles…) y también las placas y los adicionales.
+    const tipos = {};
+    const tiposUnidades = {};
     desgloses.forEach((x) => {
-      Object.entries(x.d.porTela).forEach(([k, v]) => {
-        telas[k] = (telas[k] || 0) + v;
+      Object.entries(x.d.porTipo).forEach(([k, v]) => { tipos[k] = (tipos[k] || 0) + v; });
+      Object.entries(x.d.unidadesTipo).forEach(([k, v]) => { tiposUnidades[k] = (tiposUnidades[k] || 0) + v; });
+    });
+    const rankingTipos = Object.entries(tipos)
+      .map(([tipo, valor]) => ({
+        // Placas y adicionales van en plural: acá son el rubro entero, no un renglón suelto.
+        etiqueta: CATEGORIA[tipo]?.titulo || NOMBRE_TIPO[tipo] || tipo,
+        valor,
+        detalle: contarItems(tiposUnidades[tipo] || 0, categoriaItem({ tipo })),
+      }))
+      .sort((a, b) => b.valor - a.valor);
+
+    // Ranking de telas y productos
+    const materiales = {};
+    desgloses.forEach((x) => {
+      Object.entries(x.d.porMaterial).forEach(([k, v]) => {
+        materiales[k] = (materiales[k] || 0) + v;
       });
     });
-    const rankingTelas = Object.entries(telas)
+    const rankingMateriales = Object.entries(materiales)
       .map(([etiqueta, valor]) => ({ etiqueta, valor }))
       .sort((a, b) => b.valor - a.valor)
       .slice(0, 8);
@@ -181,7 +216,7 @@ export function render(contenedor) {
       <div class="tarjeta">
         <div class="mini" style="font-weight:700;text-transform:uppercase;letter-spacing:.05em">Vendido en el período</div>
         <div class="hero">${plata(vendido)}</div>
-        <div class="sub">${pedidos.length} pedido${pedidos.length === 1 ? '' : 's'} · ${num(cortinas, 0)} cortinas · ticket promedio ${plata(ticket)}</div>
+        <div class="sub">${pedidos.length} pedido${pedidos.length === 1 ? '' : 's'} · ${frasearUnidades(unidades)} · ticket promedio ${plata(ticket)}</div>
       </div>
 
       <div class="kpis mb-16">
@@ -210,11 +245,11 @@ export function render(contenedor) {
       <div class="tarjeta">
         <div class="tarjeta__cab">
           <span class="seccion-num">01</span>
-          <div><h2>Ventas por mes</h2><div class="mini">Cada columna se divide según el tipo de cortina.</div></div>
+          <div><h2>Ventas por mes</h2><div class="mini">Cada columna se divide en cortinas, placas y adicionales.</div></div>
           <div class="der" style="display:flex;gap:.5rem;align-items:center">
             <div class="segmentado" data-metrica>
               <button data-v="plata" aria-pressed="${metrica === 'plata'}">$</button>
-              <button data-v="cantidad" aria-pressed="${metrica === 'cantidad'}">Cortinas</button>
+              <button data-v="cantidad" aria-pressed="${metrica === 'cantidad'}">Unidades</button>
             </div>
             <button class="btn btn--chico" data-tabla>${verTabla ? 'Ver gráfico' : 'Ver tabla'}</button>
           </div>
@@ -226,41 +261,52 @@ export function render(contenedor) {
         <div class="tarjeta">
           <div class="tarjeta__cab">
             <span class="seccion-num">02</span>
-            <div><h2>Telas más vendidas</h2><div class="mini">Por facturación en el período.</div></div>
+            <div><h2>Ventas por tipo</h2><div class="mini">Cada tipo de cortina, más placas y adicionales.</div></div>
           </div>
-          <div data-gr-telas></div>
+          <div data-gr-tipos></div>
         </div>
 
         <div class="tarjeta">
           <div class="tarjeta__cab">
             <span class="seccion-num">03</span>
+            <div><h2>Lo más vendido</h2><div class="mini">Telas y productos, por facturación.</div></div>
+          </div>
+          <div data-gr-materiales></div>
+        </div>
+      </div>
+
+      <div class="grid grid--2">
+        <div class="tarjeta">
+          <div class="tarjeta__cab">
+            <span class="seccion-num">04</span>
             <div><h2>Mejores clientes</h2><div class="mini">Los que más te compraron.</div></div>
           </div>
           <div data-gr-clientes></div>
         </div>
-      </div>
 
-      <div class="tarjeta">
-        <div class="tarjeta__cab">
-          <span class="seccion-num">04</span>
-          <div><h2>Presupuestos</h2><div class="mini">En qué terminaron los del período.</div></div>
+        <div class="tarjeta">
+          <div class="tarjeta__cab">
+            <span class="seccion-num">05</span>
+            <div><h2>Presupuestos</h2><div class="mini">En qué terminaron los del período.</div></div>
+          </div>
+          <div data-gr-estados></div>
         </div>
-        <div data-gr-estados></div>
       </div>
     `;
 
     const cajaMeses = cuerpo.querySelector('[data-gr-meses]');
-    const formato = metrica === 'plata' ? plata : (v) => `${num(v, 0)} cortinas`;
+    const formato = metrica === 'plata' ? plata : (v) => `${num(v, 0)} ${v === 1 ? 'unidad' : 'unidades'}`;
 
-    if (verTabla) {
-      cajaMeses.innerHTML = tablaDeSeries({ etiquetas: meses.map(etiquetaMes), series, formato });
-    } else if (series.every((s) => s.valores.every((v) => !v))) {
+    if (!series.length) {
       cajaMeses.innerHTML = '<div class="mini">Todavía no hay pedidos en este período.</div>';
+    } else if (verTabla) {
+      cajaMeses.innerHTML = tablaDeSeries({ etiquetas: meses.map(etiquetaMes), series, formato });
     } else {
       columnasApiladas(cajaMeses, { etiquetas: meses.map(etiquetaMes), series, formato, titulo: 'Ventas por mes' });
     }
 
-    barrasHorizontales(cuerpo.querySelector('[data-gr-telas]'), { items: rankingTelas });
+    barrasHorizontales(cuerpo.querySelector('[data-gr-tipos]'), { items: rankingTipos });
+    barrasHorizontales(cuerpo.querySelector('[data-gr-materiales]'), { items: rankingMateriales });
     barrasHorizontales(cuerpo.querySelector('[data-gr-clientes]'), { items: rankingClientes, color: SERIES[1] });
 
     // Estados de presupuestos
@@ -294,11 +340,6 @@ export function render(contenedor) {
       verTabla = !verTabla;
       pintar();
     });
-  }
-
-  function contarCortinas(x, tipo) {
-    const t = calcularTotales(x.pedido.items, estado.config, {});
-    return t.lineas.filter(({ item }) => item.tipo === tipo).reduce((a, l) => a + l.calc.cantidad, 0);
   }
 
   pintar();

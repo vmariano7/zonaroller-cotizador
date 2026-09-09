@@ -1,7 +1,7 @@
 // Pedidos confirmados: listado, alta desde cero o desde presupuesto, y detalle con pagos.
 
 import { estado, guardar, borrar, obtener, proximoNumero } from '../store.js';
-import { calcularTotales, descripcionItem, detallesTecnicos, CATEGORIA, categoriaDoc, contarItems, NOMBRE_TIPO } from '../calc.js';
+import { calcularTotales, descripcionItem, detallesTecnicos, CATEGORIA, categoriaDoc, contarItems, unidadesDeDocs, NOMBRE_TIPO } from '../calc.js';
 import {
   plata, num, fecha, esc, aviso, confirmar, chip, vacio, modal, hoyISO, leerNumero, ESTADOS_PEDIDO, medidaTexto,
 } from '../ui.js';
@@ -148,7 +148,6 @@ export function render(contenedor) {
     const costo = enRango.reduce((a, p) => a + costos(p).total, 0);
     const ganancia = vendido - costo;
     const pct = vendido ? (ganancia / vendido) * 100 : 0;
-    const cortinas = enRango.reduce((a, p) => a + (Number(p.cantidadCortinas) || 0), 0);
     const pagado = enRango.reduce((a, p) => a + cobrado(p), 0);
     const pendiente = enRango.reduce((a, p) => a + Math.max(0, saldo(p)), 0);
 
@@ -162,7 +161,7 @@ export function render(contenedor) {
         <div class="kpi">
           <div class="kpi__etiqueta">Vendido</div>
           <div class="kpi__valor">${plata(vendido)}</div>
-          <div class="kpi__pie">${enRango.length} pedido${enRango.length === 1 ? '' : 's'} · ${num(cortinas, 0)} cortinas</div>
+          <div class="kpi__pie">${enRango.length} pedido${enRango.length === 1 ? '' : 's'} · ${unidadesDeDocs(enRango)}</div>
         </div>
         <div class="kpi">
           <div class="kpi__etiqueta">Costo abonado</div>

@@ -325,7 +325,13 @@ export function detallesTecnicos(item) {
  * Devuelve con qué está armado, mirando sus renglones.
  */
 export function categoriaDoc(doc) {
-  const tipo = (doc?.items || []).find((it) => it?.tipo)?.tipo;
+  const item = (doc?.items || []).find((it) => it?.tipo);
+  return item ? categoriaItem(item) : 'cortina';
+}
+
+/** De qué categoría es un renglón suelto: cortina, placa o adicional. */
+export function categoriaItem(item) {
+  const tipo = item?.tipo;
   return tipo === 'placa' || tipo === 'adicional' ? tipo : 'cortina';
 }
 
@@ -341,6 +347,41 @@ export function contarItems(cantidad, categoria) {
   const cat = CATEGORIA[categoria] || CATEGORIA.cortina;
   const n = Number(cantidad) || 0;
   return `${n} ${n === 1 ? cat.singular : cat.plural}`;
+}
+
+/**
+ * Con qué está hecho el renglón, para los rankings: la tela si es una cortina,
+ * el producto si es una placa o un adicional. Sin esto, una placa entra a los
+ * rankings como "undefined": no tiene tela.
+ */
+export function materialItem(item) {
+  if (categoriaItem(item) === 'cortina') return item?.tela || '';
+  return item?.producto || NOMBRE_TIPO[item?.tipo] || '';
+}
+
+/**
+ * Cuántas unidades hay de cada categoría, en texto: "5 cortinas · 2 placas".
+ * Recibe un objeto { cortina, placa, adicional } y saltea las que están en 0.
+ */
+export function frasearUnidades(unidades) {
+  const partes = Object.keys(CATEGORIA)
+    .filter((cat) => Number(unidades?.[cat]) > 0)
+    .map((cat) => contarItems(unidades[cat], cat));
+  return partes.length ? partes.join(' · ') : contarItems(0, 'cortina');
+}
+
+/**
+ * Lo mismo, contando documentos enteros: cada presupuesto o pedido es de una
+ * sola categoría, así que sus unidades se suman a la que le corresponde. Sin
+ * esto, un pedido de placas figuraba como si fueran cortinas.
+ */
+export function unidadesDeDocs(docs) {
+  const unidades = {};
+  (docs || []).forEach((d) => {
+    const cat = categoriaDoc(d);
+    unidades[cat] = (unidades[cat] || 0) + (Number(d.cantidadCortinas) || 0);
+  });
+  return frasearUnidades(unidades);
 }
 
 /** El catálogo de productos de una categoría, tal como se carga en Ajustes. */

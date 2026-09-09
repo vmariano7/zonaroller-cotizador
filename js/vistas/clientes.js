@@ -3,8 +3,8 @@
 // una vez, el cliente ya existe.
 
 import { estado } from '../store.js';
-import { calcularTotales } from '../calc.js';
-import { plata, num, fecha, esc, chip, vacio, ESTADOS_PRESUPUESTO, ESTADOS_PEDIDO } from '../ui.js';
+import { calcularTotales, categoriaDoc, categoriaItem, materialItem, contarItems, frasearUnidades } from '../calc.js';
+import { plata, fecha, esc, chip, vacio, ESTADOS_PRESUPUESTO, ESTADOS_PEDIDO } from '../ui.js';
 import { navegar } from '../router.js';
 import { totalPedido, cobrado, saldo } from '../dinero.js';
 
@@ -40,7 +40,9 @@ export function listarClientes() {
         pedidos: [],
         comprado: 0,
         debe: 0,
-        cortinas: 0,
+        // Cuánto le vendiste de cada cosa. Va separado por categoría: un
+        // pedido de placas no son cortinas.
+        unidades: {},
         ultima: '',
       });
     }
@@ -61,7 +63,8 @@ export function listarClientes() {
       if (doc.estado !== 'cancelado') {
         c.comprado += totalPedido(doc);
         c.debe += Math.max(0, saldo(doc));
-        c.cortinas += doc.cantidadCortinas || 0;
+        const cat = categoriaDoc(doc);
+        c.unidades[cat] = (c.unidades[cat] || 0) + (doc.cantidadCortinas || 0);
       }
     }
   };
@@ -172,15 +175,19 @@ export function renderDetalle(contenedor, params) {
   const pagado = activos.reduce((a, p) => a + cobrado(p), 0);
   const tel = soloDigitos(c.telefono);
 
-  // Qué le gusta comprar
-  const telas = {};
+  // Qué le gusta comprar: la tela si es cortina, el producto si es placa o
+  // adicional. Antes se miraba sólo la tela, así que una placa entraba como
+  // "undefined".
+  const materiales = {};
   activos.forEach((p) => {
     calcularTotales(p.items, estado.config, {}).lineas.forEach(({ item, calc }) => {
-      const k = item.tela;
-      telas[k] = (telas[k] || 0) + calc.cantidad;
+      const k = materialItem(item);
+      if (!k) return;
+      if (!materiales[k]) materiales[k] = { cantidad: 0, categoria: categoriaItem(item) };
+      materiales[k].cantidad += calc.cantidad;
     });
   });
-  const favoritas = Object.entries(telas).sort((a, b) => b[1] - a[1]).slice(0, 3);
+  const favoritas = Object.entries(materiales).sort((a, b) => b[1].cantidad - a[1].cantidad).slice(0, 3);
 
   contenedor.innerHTML = `
     <div class="titulo-pagina">
@@ -196,7 +203,7 @@ export function renderDetalle(contenedor, params) {
     </div>
 
     <div class="kpis mb-16">
-      <div class="kpi"><div class="kpi__etiqueta">Te compró</div><div class="kpi__valor">${plata(c.comprado)}</div><div class="kpi__pie">${activos.length} pedido${activos.length === 1 ? '' : 's'} · ${num(c.cortinas, 0)} cortinas</div></div>
+      <div class="kpi"><div class="kpi__etiqueta">Te compró</div><div class="kpi__valor">${plata(c.comprado)}</div><div class="kpi__pie">${activos.length} pedido${activos.length === 1 ? '' : 's'} · ${frasearUnidades(c.unidades)}</div></div>
       <div class="kpi kpi--verde"><div class="kpi__etiqueta">Pagó</div><div class="kpi__valor">${plata(pagado)}</div></div>
       <div class="kpi ${c.debe > 0 ? 'kpi--rojo' : 'kpi--verde'}"><div class="kpi__etiqueta">Debe</div><div class="kpi__valor">${plata(c.debe)}</div></div>
       <div class="kpi"><div class="kpi__etiqueta">Última vez</div><div class="kpi__valor" style="font-size:1rem">${c.ultima ? fecha(c.ultima) : '—'}</div><div class="kpi__pie">${favoritas.length ? `prefiere ${esc(favoritas[0][0])}` : ''}</div></div>
@@ -211,7 +218,7 @@ export function renderDetalle(contenedor, params) {
             <div class="item-lista" data-ir="/pedido/${p.id}">
               <div class="item-lista__cuerpo">
                 <div class="item-lista__titulo">${esc(p.numero)} ${chip(ESTADOS_PEDIDO, p.estado)}</div>
-                <div class="mini">${fecha(p.fecha)} · ${p.cantidadCortinas || 0} cortinas${saldo(p) > 0 ? ` · debe ${plata(saldo(p))}` : ''}</div>
+                <div class="mini">${fecha(p.fecha)} · ${contarItems(p.cantidadCortinas || 0, categoriaDoc(p))}${saldo(p) > 0 ? ` · debe ${plata(saldo(p))}` : ''}</div>
               </div>
               <div class="item-lista__monto">${plata(totalPedido(p))}</div>
             </div>`).join('')}</div>` : '<div class="mini">Todavía no te compró.</div>'}
@@ -225,7 +232,7 @@ export function renderDetalle(contenedor, params) {
             <div class="item-lista" data-ir="/presupuesto/${p.id}">
               <div class="item-lista__cuerpo">
                 <div class="item-lista__titulo">${esc(p.numero)} ${chip(ESTADOS_PRESUPUESTO, p.estado)}</div>
-                <div class="mini">${fecha(p.fecha)} · ${p.cantidadCortinas || 0} cortinas</div>
+                <div class="mini">${fecha(p.fecha)} · ${contarItems(p.cantidadCortinas || 0, categoriaDoc(p))}</div>
               </div>
               <div class="item-lista__monto">${plata(p.total)}</div>
             </div>`).join('')}</div>` : '<div class="mini">Sin presupuestos.</div>'}
@@ -236,7 +243,7 @@ export function renderDetalle(contenedor, params) {
     <div class="tarjeta">
       <div class="tarjeta__cab"><h2>Qué le gusta</h2></div>
       <div class="fila-botones">
-        ${favoritas.map(([tela, cant]) => `<span class="chip chip--gris" style="font-size:.78rem;padding:.3rem .6rem">${esc(tela)} · ${cant} cortina${cant === 1 ? '' : 's'}</span>`).join('')}
+        ${favoritas.map(([nombre, f]) => `<span class="chip chip--gris" style="font-size:.78rem;padding:.3rem .6rem">${esc(nombre)} · ${contarItems(f.cantidad, f.categoria)}</span>`).join('')}
       </div>
     </div>` : ''}
   `;
