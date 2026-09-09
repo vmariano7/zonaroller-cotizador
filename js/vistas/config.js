@@ -2,7 +2,7 @@
 // sincronización con la nube y respaldos.
 
 import { estado, guardarConfig, cerrarSesion, sincronizar, exportarRespaldo, importarRespaldo } from '../store.js';
-import { TIPOS, CATEGORIA, sistemasDeConfig, usaSistemaBasico } from '../calc.js';
+import { TIPOS, CATEGORIA, sistemasDeConfig, usaSistemaBasico, esSistemaFijo } from '../calc.js';
 import { esc, aviso, confirmar, descargarArchivo, fecha, plata, modal } from '../ui.js';
 import { plantillaDe, CLAVES } from '../mensaje.js';
 import { tienePin, definirPin } from '../candado.js';
@@ -657,16 +657,24 @@ function dialogoTelas(tipo, alGuardar) {
  * igual que cualquier otro: si se borra uno que el cálculo sigue necesitando,
  * esa combinación de tela pasa a costar $0 de sistema hasta que se cargue uno
  * nuevo (igual que cualquier costo sin cargar en esta app).
+ *
+ * Los tres de paneles orientales son la excepción: el nombre lo pone el
+ * cotizador (ver SISTEMAS_PANEL) porque son las opciones del selector, así que
+ * acá sólo se les carga el costo y no se pueden renombrar ni borrar. Un
+ * sistema agregado a mano, en cambio, no queda atado a ningún tipo de cortina:
+ * queda para cargarle un costo, pero el cotizador no lo ofrece en ningún lado.
  */
 function dialogoSistemas(alGuardar) {
-  const catalogoOriginal = estado.config.catalogoSistemas?.length
-    ? estado.config.catalogoSistemas
-    : Object.entries(SISTEMAS).map(([id, nombre]) => ({ id, nombre, protegido: true }));
-  let lista = catalogoOriginal.map((s) => ({ ...s, precio: Number(estado.config.sistemas?.[s.id]) || 0 }));
+  // La lista sale de sistemasDeConfig y no del catálogo guardado a secas: así
+  // los sistemas que el cálculo conoce pero el config todavía no tiene (los de
+  // paneles orientales, sin ir más lejos) aparecen acá, y guardar no les borra
+  // el costo por no haber estado en la lista.
+  let lista = sistemasDeConfig(estado.config).map((s) => ({ ...s, precio: Number(estado.config.sistemas?.[s.id]) || 0 }));
 
   const m = modal('Sistemas', `
-    <div class="mini mb-16">Agregá, renombrá o borrá sistemas. Los marcados con ★ son los que elige
-    solo el cálculo según la tela (no se asignan a mano).</div>
+    <div class="mini mb-16">Agregá, renombrá o borrá sistemas. Los marcados con ★ los pone el cotizador:
+    o los elige solo el cálculo según la tela, o son las tres opciones de paneles orientales, que ya
+    vienen con el nombre puesto y sólo necesitan que les cargues el costo.</div>
     <div data-filas></div>
     <button class="btn btn--chico mt-16" data-agregar style="width:100%">+ Agregar sistema</button>
     <div class="fila-botones fila-botones--fin mt-16">
@@ -679,12 +687,14 @@ function dialogoSistemas(alGuardar) {
   function pintarFilas() {
     cajaFilas.innerHTML = lista.map((s, i) => `
       <div class="campo" style="display:flex;align-items:center;gap:.5rem;margin-bottom:.5rem">
-        <input data-nombre="${i}" placeholder="Nombre del sistema" value="${esc(s.nombre)}" style="flex:1">
-        ${s.protegido ? '<span class="mini" title="Lo asigna solo el cálculo">★</span>' : ''}
+        <input data-nombre="${i}" placeholder="Nombre del sistema" value="${esc(s.nombre)}" style="flex:1"${esSistemaFijo(s.id) ? ' readonly title="Es una de las tres opciones de paneles orientales: el nombre lo pone el cotizador"' : ''}>
+        ${s.protegido ? `<span class="mini" title="${esSistemaFijo(s.id) ? 'Opción fija del selector de paneles orientales' : 'Lo asigna solo el cálculo'}">★</span>` : ''}
         <div class="con-prefijo" style="width:140px"><span>$</span>
           <input type="number" inputmode="decimal" min="0" step="1" data-precio="${i}" value="${s.precio}">
         </div>
-        <button class="btn-icono" data-quitar="${i}" title="Quitar">&#10005;</button>
+        ${esSistemaFijo(s.id)
+          ? '<span class="btn-icono" style="visibility:hidden"></span>'
+          : `<button class="btn-icono" data-quitar="${i}" title="Quitar">&#10005;</button>`}
       </div>`).join('');
 
     cajaFilas.querySelectorAll('[data-nombre]').forEach((inp) =>

@@ -44,14 +44,31 @@ export const SISTEMAS = {
   vertical_basico: 'Vertical · Blackout / Sunscreen 5%',
   vertical_demas: 'Vertical · Demás telas',
   zebra: 'Sistema Zebra',
-  // Los paneles orientales se pueden hacer con tres sistemas distintos, cada
-  // uno con su costo. Los nombres son de relleno: se ponen en Ajustes.
+  // Los paneles orientales se pueden hacer con tres sistemas distintos, uno
+  // por cantidad de canales del riel. Cuál va en cada cortina se elige a mano
+  // al cotizar (ver sistemasElegibles) y el costo de cada uno se carga en
+  // Ajustes; el nombre, en cambio, lo pone el código: son opciones fijas del
+  // cotizador, no sistemas sueltos.
   // Ojo con la clave del primero: es la que ya venía, así que un renglón
   // cotizado antes de que fueran tres sigue valiendo lo mismo.
-  panel_oriental: 'Paneles orientales · Sistema 1',
-  panel_oriental_2: 'Paneles orientales · Sistema 2',
-  panel_oriental_3: 'Paneles orientales · Sistema 3',
+  panel_oriental: 'Paneles orientales · 3 canales',
+  panel_oriental_2: 'Paneles orientales · 4 canales',
+  panel_oriental_3: 'Paneles orientales · 5 canales',
 };
+
+/**
+ * Los tres sistemas de paneles orientales. Son los únicos cuyo nombre no se
+ * edita en Ajustes: como el selector del cotizador ofrece estos tres y nada
+ * más, el nombre sale de SISTEMAS para que las opciones se vean siempre
+ * iguales, aunque el catálogo guardado tenga otra cosa. El costo sí se carga
+ * en Ajustes, como el de cualquier otro.
+ */
+export const SISTEMAS_PANEL = ['panel_oriental', 'panel_oriental_2', 'panel_oriental_3'];
+
+/** ¿El nombre de este sistema lo pone el código? */
+export function esSistemaFijo(id) {
+  return SISTEMAS_PANEL.includes(id);
+}
 
 /**
  * Los sistemas entre los que se elige a mano al cotizar. Sólo los paneles
@@ -60,9 +77,8 @@ export const SISTEMAS = {
  */
 export function sistemasElegibles(tipo, config) {
   if (tipo !== 'panel_oriental') return [];
-  const ids = ['panel_oriental', 'panel_oriental_2', 'panel_oriental_3'];
   const catalogo = sistemasDeConfig(config);
-  return ids.map((id) => catalogo.find((s) => s.id === id)).filter(Boolean);
+  return SISTEMAS_PANEL.map((id) => catalogo.find((s) => s.id === id)).filter(Boolean);
 }
 
 /**
@@ -72,7 +88,11 @@ export function sistemasElegibles(tipo, config) {
  * config que se guardó antes de que existiera.
  */
 export function sistemasDeConfig(config) {
-  const guardados = config?.catalogoSistemas || [];
+  // Los tres de paneles orientales van con el nombre del código aunque el
+  // catálogo guardado tenga otro: ver SISTEMAS_PANEL.
+  const guardados = (config?.catalogoSistemas || []).map((s) => (
+    esSistemaFijo(s.id) ? { ...s, nombre: SISTEMAS[s.id], protegido: true } : s
+  ));
   const faltantes = Object.entries(SISTEMAS)
     .filter(([id]) => !guardados.some((s) => s.id === id))
     .map(([id, nombre]) => ({ id, nombre, protegido: true }));
@@ -95,6 +115,7 @@ export const NOMBRE_TIPO = {
  * `SISTEMAS` queda como default para configs viejas que todavía no lo tienen.
  */
 export function nombreSistema(id, config) {
+  if (esSistemaFijo(id)) return SISTEMAS[id];
   const enCatalogo = (config?.catalogoSistemas || []).find((s) => s.id === id);
   return enCatalogo?.nombre || SISTEMAS[id] || id;
 }
