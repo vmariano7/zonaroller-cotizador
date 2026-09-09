@@ -2,7 +2,7 @@
 // El orden importa: primero las cortinas (que es lo que se cotiza a diario) y
 // los datos del cliente arriba, plegados, para que no tapen lo principal.
 
-import { TIPOS, ARMADO, ARMADO_POR_TIPO, itemVacio, calcularItem, calcularTotales, hayPreciosCargados, descripcionItem, detallesTecnicos, admiteMotor, telasDeTipo, superficiePlaca, catalogoDe } from '../calc.js';
+import { TIPOS, ARMADO, ARMADO_POR_TIPO, itemVacio, calcularItem, calcularTotales, hayPreciosCargados, descripcionItem, detallesTecnicos, admiteMotor, telasDeTipo, superficiePlaca, catalogoDe, sistemasElegibles, sistemaAuto } from '../calc.js';
 import { estado } from '../store.js';
 import { el, esc, plata, num, leerNumero, hoyISO, aviso } from '../ui.js';
 import { armarMensaje, datosContado, copiar } from '../mensaje.js';
@@ -368,6 +368,23 @@ export function montarEditor(contenedor, doc, {
         </div>
     `;
 
+    // Los paneles orientales se hacen con tres sistemas distintos, cada uno con
+    // su costo: hay que elegirlo a mano. En los demás tipos lo decide la tela,
+    // así que este bloque no aparece. Va afuera de las opciones avanzadas
+    // porque mueve el precio.
+    const elegibles = sistemasElegibles(item.tipo, config);
+    const sistemaActual = item.sistemaKey || sistemaAuto(item.tipo, item.tela, config);
+    const campoSistema = elegibles.length ? `
+        <div class="campos campos--4 mt-16">
+          <div>
+            <label>Sistema</label>
+            <select data-campo="sistemaKey">
+              ${elegibles.map((s) => `<option value="${esc(s.id)}"${s.id === sistemaActual ? ' selected' : ''}>${esc(s.nombre)}</option>`).join('')}
+            </select>
+          </div>
+        </div>
+    ` : '';
+
     const selectArmado = (campo) => {
       const def = ARMADO[campo];
       return `
@@ -440,6 +457,7 @@ export function montarEditor(contenedor, doc, {
 
         ${tarjetasTipo}
         ${camposMedidas}
+        ${campoSistema}
         ${opcionesAvanzadas}
 
         <div class="cortina__resumen" data-resumen></div>

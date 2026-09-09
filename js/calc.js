@@ -44,8 +44,26 @@ export const SISTEMAS = {
   vertical_basico: 'Vertical · Blackout / Sunscreen 5%',
   vertical_demas: 'Vertical · Demás telas',
   zebra: 'Sistema Zebra',
-  panel_oriental: 'Sistema Paneles Orientales',
+  // Los paneles orientales se pueden hacer con tres sistemas distintos, cada
+  // uno con su costo. Los nombres son de relleno: se ponen en Ajustes.
+  // Ojo con la clave del primero: es la que ya venía, así que un renglón
+  // cotizado antes de que fueran tres sigue valiendo lo mismo.
+  panel_oriental: 'Paneles orientales · Sistema 1',
+  panel_oriental_2: 'Paneles orientales · Sistema 2',
+  panel_oriental_3: 'Paneles orientales · Sistema 3',
 };
+
+/**
+ * Los sistemas entre los que se elige a mano al cotizar. Sólo los paneles
+ * orientales: en los demás tipos el sistema lo decide el tipo y la tela
+ * (ver sistemaAuto), así que no hay nada que elegir.
+ */
+export function sistemasElegibles(tipo, config) {
+  if (tipo !== 'panel_oriental') return [];
+  const ids = ['panel_oriental', 'panel_oriental_2', 'panel_oriental_3'];
+  const catalogo = sistemasDeConfig(config);
+  return ids.map((id) => catalogo.find((s) => s.id === id)).filter(Boolean);
+}
 
 /**
  * Los sistemas que hay para elegir en Ajustes: los guardados más los que el
@@ -147,7 +165,10 @@ export function configVacia() {
     // `protegido` son los que arma el cálculo automático (ver sistemaAuto);
     // se pueden renombrar o borrar igual, pero Ajustes avisa antes de borrarlos.
     catalogoSistemas: Object.entries(SISTEMAS).map(([id, nombre]) => ({ id, nombre, protegido: true })),
-    sistemas: { roller_basico: 0, roller_demas: 0, vertical_basico: 0, vertical_demas: 0, zebra: 0, panel_oriental: 0 },
+    sistemas: {
+      roller_basico: 0, roller_demas: 0, vertical_basico: 0, vertical_demas: 0, zebra: 0,
+      panel_oriental: 0, panel_oriental_2: 0, panel_oriental_3: 0,
+    },
     // Telas que usan el sistema "básico" (más económico) en roller y vertical.
     telasSistemaBasico: ['Blackout', 'Sunscreen 5%'],
     // Placas y adicionales: catálogos de productos simples (nombre + precio)
