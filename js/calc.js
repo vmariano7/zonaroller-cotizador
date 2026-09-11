@@ -229,6 +229,9 @@ export function configVacia() {
     // Numeración de los recibos de pago, para seguir la serie que ya venías
     // haciendo a mano. Ver recibo.js.
     recibos: { puntoVenta: '0001', proximo: 1 },
+    // Proveedores y lo que le debés a cada uno. Se carga a mano en Caja y se
+    // descuenta del capital proyectado. Ver dialogoProveedores en caja.js.
+    proveedores: [],
     // Gastos fijos que se cargaban cuando Caja mostraba el objetivo del mes.
     // Ese tablero se sacó; los datos quedan guardados por si vuelve.
     gastosFijos: [],

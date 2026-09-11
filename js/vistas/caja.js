@@ -77,6 +77,15 @@ export function render(contenedor, params = {}) {
       .sort((a, b) => String(b.pedido.fecha || '').localeCompare(String(a.pedido.fecha || '')));
     const aPagarFabrica = pendientesProduccion.reduce((a, i) => a + i.monto, 0);
 
+    // Lo que le debés a cada proveedor. Es un saldo que se carga a mano: cuando
+    // pagás, lo bajás acá y la salida de plata se registra con "+ Movimiento",
+    // igual que cualquier otro gasto.
+    const proveedores = (estado.config.proveedores || [])
+      .map((pr) => ({ ...pr, saldo: Number(pr.saldo) || 0 }))
+      .sort((a, b) => b.saldo - a.saldo || a.nombre.localeCompare(b.nombre));
+    const deudaProveedores = proveedores.reduce((a, pr) => a + pr.saldo, 0);
+    const proveedoresConSaldo = proveedores.filter((pr) => pr.saldo > 0).length;
+
     // Movimientos del mes
     const pagosMes = activos.flatMap((p) =>
       (p.pagos || []).filter((g) => mesDe(g.fecha) === mes).map((g) => ({ ...g, pedido: p }))
@@ -96,9 +105,10 @@ export function render(contenedor, params = {}) {
 
     const sc = saldosCaja();
     // Con lo que hay hoy, más lo que los clientes deben, menos lo que hay que
-    // pagarle al instalador por lo que todavía no se instaló y menos lo que
-    // va a salir a producción (pedidos "pendiente") en cuanto se le pague a la fábrica.
-    const capital = sc.total + porCobrar - aPagarInstal - aPagarFabrica;
+    // pagarle al instalador por lo que todavía no se instaló, menos lo que
+    // va a salir a producción (pedidos "pendiente") en cuanto se le pague a la
+    // fábrica, y menos lo que se les debe a los proveedores.
+    const capital = sc.total + porCobrar - aPagarInstal - aPagarFabrica - deudaProveedores;
 
     cuerpo.innerHTML = `
       <div class="tarjeta mb-16">
@@ -131,7 +141,7 @@ export function render(contenedor, params = {}) {
         <div class="mini">Todavía no cargaste el punto de partida, así que no puedo decirte cuánto tenés.</div>`}
       </div>
 
-      <div class="kpis mb-16">
+      <div class="kpis kpis--5 mb-16">
         <div class="kpi kpi--rojo">
           <div class="kpi__etiqueta">Por cobrar</div>
           <div class="kpi__valor">${plata(porCobrar)}</div>
@@ -147,10 +157,15 @@ export function render(contenedor, params = {}) {
           <div class="kpi__valor">${plata(aPagarFabrica)}</div>
           <div class="kpi__pie">${pendientesProduccion.length} pedido${pendientesProduccion.length === 1 ? '' : 's'} sin mandar a fábrica</div>
         </div>
+        <div class="kpi">
+          <div class="kpi__etiqueta">Proveedores</div>
+          <div class="kpi__valor">${plata(deudaProveedores)}</div>
+          <div class="kpi__pie">${proveedoresConSaldo} proveedor${proveedoresConSaldo === 1 ? '' : 'es'} con saldo</div>
+        </div>
         <div class="kpi ${capital >= 0 ? 'kpi--verde' : 'kpi--rojo'}">
           <div class="kpi__etiqueta">Capital proyectado</div>
           <div class="kpi__valor">${plata(capital)}</div>
-          <div class="kpi__pie">disponible + por cobrar − instalaciones − producción</div>
+          <div class="kpi__pie">disponible + por cobrar − instalaciones − producción − proveedores</div>
         </div>
       </div>
 
@@ -159,7 +174,7 @@ export function render(contenedor, params = {}) {
         <a class="btn btn--chico" href="#/presupuestos">Revisar</a>
       </div>
 
-      <div class="grid grid--3">
+      <div class="grid grid--2">
         <div class="tarjeta">
           <div class="tarjeta__cab"><span class="seccion-num">1</span><h2>Clientes que deben</h2></div>
           ${deudores.length ? `
@@ -216,11 +231,34 @@ export function render(contenedor, params = {}) {
           <div class="mini mt-16">Cuando le pagués a la fábrica, cambiá el estado del pedido a
           "En producción" y sale solo de esta lista.</div>` : '<div class="mini">No tenés pedidos pendientes de mandar a producción.</div>'}
         </div>
+
+        <div class="tarjeta">
+          <div class="tarjeta__cab">
+            <span class="seccion-num">4</span><h2>Proveedores</h2>
+            <div class="der"><button class="btn btn--chico" data-proveedores>${proveedores.length ? 'Agregar / editar' : 'Agregar proveedor'}</button></div>
+          </div>
+          ${proveedores.length ? `
+          <div class="tabla-scroll">
+            <table>
+              <thead><tr><th>Proveedor</th><th class="num">Le debés</th></tr></thead>
+              <tbody>
+                ${proveedores.map((pr) => `
+                  <tr>
+                    <td>${esc(pr.nombre)}</td>
+                    <td class="num"${pr.saldo > 0 ? ' style="color:var(--rojo)"' : ''}><strong>${plata(pr.saldo)}</strong></td>
+                  </tr>`).join('')}
+                ${proveedores.length > 1 ? `<tr><td><strong>Total</strong></td><td class="num"><strong>${plata(deudaProveedores)}</strong></td></tr>` : ''}
+              </tbody>
+            </table>
+          </div>
+          <div class="mini mt-16">Cuando le pagues a un proveedor, bajá su saldo acá y cargá la salida
+          de plata con <em>+ Movimiento</em>.</div>` : '<div class="mini">Cargá tus proveedores y cuánto le debés a cada uno: se descuenta del capital proyectado.</div>'}
+        </div>
       </div>
 
       <div class="tarjeta">
         <div class="tarjeta__cab">
-          <span class="seccion-num">4</span><h2>Movimientos</h2>
+          <span class="seccion-num">5</span><h2>Movimientos</h2>
           <div class="der">
             <select data-mes style="width:auto">
               ${meses.map((m) => `<option value="${m}"${m === mes ? ' selected' : ''}>${nombreMes(m)}</option>`).join('')}
@@ -279,6 +317,7 @@ export function render(contenedor, params = {}) {
     });
 
     cuerpo.querySelector('[data-saldos]').addEventListener('click', () => dialogoSaldos(() => pintar()));
+    cuerpo.querySelector('[data-proveedores]').addEventListener('click', () => dialogoProveedores(() => pintar()));
 
     cuerpo.querySelectorAll('[data-pagar-instal]').forEach((b) =>
       b.addEventListener('click', async () => {
@@ -340,6 +379,71 @@ function dialogoSaldos(alGuardar) {
     });
     m.cerrar();
     aviso('Saldos actualizados.');
+    alGuardar?.();
+  };
+}
+
+/**
+ * Agregar, renombrar o borrar proveedores, y cargar cuánto se le debe a cada
+ * uno. Es un saldo, no un historial: cuando pagás, lo bajás a mano. La lista
+ * vive en config.proveedores.
+ */
+function dialogoProveedores(alGuardar) {
+  let lista = (estado.config.proveedores || []).map((pr) => ({ ...pr, saldo: Number(pr.saldo) || 0 }));
+  const vacio = () => ({ id: crypto.randomUUID(), nombre: '', saldo: 0 });
+  if (!lista.length) lista.push(vacio());
+
+  const m = modal('Proveedores', `
+    <div class="mini mb-16">Cuánto le debés <strong>hoy</strong> a cada proveedor. Se descuenta del capital
+    proyectado. Cuando pagues, actualizá el saldo acá y cargá la salida de plata con <em>+ Movimiento</em>.</div>
+    <div data-filas></div>
+    <button class="btn btn--chico mt-16" data-agregar style="width:100%">+ Agregar proveedor</button>
+    <div class="fila-botones fila-botones--fin mt-16">
+      <button class="btn btn--fantasma" data-cerrar>Cancelar</button>
+      <button class="btn btn--primario" id="pv-ok">Guardar</button>
+    </div>`, { ancho: '560px' });
+
+  const cajaFilas = m.cuerpo.querySelector('[data-filas]');
+
+  function pintarFilas() {
+    cajaFilas.innerHTML = lista.map((pr, i) => `
+      <div class="campo" style="display:flex;align-items:center;gap:.5rem;margin-bottom:.5rem">
+        <input data-nombre="${i}" placeholder="Ej. Fábrica de telas" value="${esc(pr.nombre)}" style="flex:1">
+        <div class="con-prefijo" style="width:150px"><span>$</span>
+          <input type="number" inputmode="decimal" min="0" step="1" data-saldo="${i}" value="${pr.saldo}">
+        </div>
+        <button class="btn-icono" data-quitar="${i}" title="Quitar">&#10005;</button>
+      </div>`).join('');
+
+    cajaFilas.querySelectorAll('[data-nombre]').forEach((inp) =>
+      inp.addEventListener('input', () => { lista[Number(inp.dataset.nombre)].nombre = inp.value; })
+    );
+    cajaFilas.querySelectorAll('[data-saldo]').forEach((inp) =>
+      inp.addEventListener('input', () => { lista[Number(inp.dataset.saldo)].saldo = Number(inp.value) || 0; })
+    );
+    cajaFilas.querySelectorAll('[data-quitar]').forEach((b) =>
+      b.addEventListener('click', () => {
+        lista.splice(Number(b.dataset.quitar), 1);
+        if (!lista.length) lista.push(vacio());
+        pintarFilas();
+      })
+    );
+  }
+  pintarFilas();
+
+  m.cuerpo.querySelector('[data-agregar]').addEventListener('click', () => {
+    lista.push(vacio());
+    pintarFilas();
+    cajaFilas.querySelector(`[data-nombre="${lista.length - 1}"]`)?.focus();
+  });
+
+  m.cuerpo.querySelector('#pv-ok').onclick = async () => {
+    const limpia = lista
+      .filter((pr) => pr.nombre.trim())
+      .map((pr) => ({ id: pr.id || crypto.randomUUID(), nombre: pr.nombre.trim(), saldo: Math.max(0, Number(pr.saldo) || 0) }));
+    await guardarConfig({ proveedores: limpia });
+    m.cerrar();
+    aviso('Proveedores actualizados.');
     alGuardar?.();
   };
 }

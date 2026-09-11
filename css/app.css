@@ -281,7 +281,10 @@ tbody tr:hover { background: var(--fondo-2); }
 /* ---------- KPI ---------- */
 
 .kpis { display: grid; gap: .75rem; grid-template-columns: 1fr 1fr; }
-@media (min-width: 760px) { .kpis { grid-template-columns: repeat(4, 1fr); } }
+@media (min-width: 760px) {
+  .kpis { grid-template-columns: repeat(4, 1fr); }
+  .kpis--5 { grid-template-columns: repeat(5, 1fr); }
+}
 .kpi {
   background: var(--fondo); border: 1px solid var(--linea);
   border-radius: var(--radio); padding: .85rem;
