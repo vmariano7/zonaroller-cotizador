@@ -324,12 +324,17 @@ export function detallesTecnicos(item) {
 }
 
 /**
- * Un presupuesto o pedido es de una sola categoría: se elige al crearlo.
- * Devuelve con qué está armado, mirando sus renglones.
+ * De qué es un presupuesto o pedido, mirando sus renglones. Se elige al
+ * crearlo, pero un presupuesto de cortinas (o de placas) puede llevar
+ * adicionales enganchados; manda lo principal, que es lo que decide qué
+ * editor se abre y qué mensaje se manda.
  */
 export function categoriaDoc(doc) {
-  const item = (doc?.items || []).find((it) => it?.tipo);
-  return item ? categoriaItem(item) : 'cortina';
+  const cats = new Set((doc?.items || []).filter((it) => it?.tipo).map(categoriaItem));
+  if (cats.has('cortina')) return 'cortina';
+  if (cats.has('placa')) return 'placa';
+  if (cats.has('adicional')) return 'adicional';
+  return 'cortina';
 }
 
 /** De qué categoría es un renglón suelto: cortina, placa o adicional. */
@@ -373,18 +378,30 @@ export function frasearUnidades(unidades) {
   return partes.length ? partes.join(' · ') : contarItems(0, 'cortina');
 }
 
+/** Cuántas unidades hay de cada categoría entre estos renglones: { cortina, placa, adicional }. */
+export function unidadesDeItems(items) {
+  const unidades = {};
+  (items || []).forEach((it) => {
+    const cat = categoriaItem(it);
+    unidades[cat] = (unidades[cat] || 0) + Math.max(1, Number(it.cantidad) || 1);
+  });
+  return unidades;
+}
+
 /**
- * Lo mismo, contando documentos enteros: cada presupuesto o pedido es de una
- * sola categoría, así que sus unidades se suman a la que le corresponde. Sin
- * esto, un pedido de placas figuraba como si fueran cortinas.
+ * Lo mismo sumando documentos enteros. Se cuentan los renglones uno por uno:
+ * un presupuesto de cortinas puede traer adicionales, y cada cosa va a su
+ * categoría. Sin esto, un pedido de placas figuraba como si fueran cortinas.
  */
 export function unidadesDeDocs(docs) {
   const unidades = {};
   (docs || []).forEach((d) => {
-    const cat = categoriaDoc(d);
-    unidades[cat] = (unidades[cat] || 0) + (Number(d.cantidadCortinas) || 0);
+    const propias = d?.items?.length
+      ? unidadesDeItems(d.items)
+      : { [categoriaDoc(d)]: Number(d?.cantidadCortinas) || 0 };
+    Object.entries(propias).forEach(([cat, n]) => { unidades[cat] = (unidades[cat] || 0) + n; });
   });
-  return frasearUnidades(unidades);
+  return unidades;
 }
 
 /** El catálogo de productos de una categoría, tal como se carga en Ajustes. */
@@ -815,7 +832,10 @@ export function calcularTotales(items, config, opciones = {}) {
   const lista = items || [];
   // El recargo del instalador depende del trabajo entero: si el viaje es por
   // una sola cortina cobra más, así que cada renglón necesita saber el total.
-  const cortinasTotales = lista.reduce((a, it) => a + Math.max(1, Number(it.cantidad) || 1), 0);
+  // Se cuentan sólo las cortinas: un adicional enganchado al mismo presupuesto
+  // no le ahorra el viaje a nadie.
+  const unidades = unidadesDeItems(lista);
+  const cortinasTotales = unidades.cortina || 0;
   const lineas = lista.map((it) => ({ item: it, calc: calcularItem(it, config, { cortinasTotales }) }));
 
   const subtotal = lineas.reduce((a, l) => a + l.calc.total, 0);
@@ -834,6 +854,8 @@ export function calcularTotales(items, config, opciones = {}) {
   return {
     lineas,
     cantidadCortinas,
+    // Lo mismo abierto por categoría, para decir "3 cortinas · 1 adicional".
+    unidades,
     subtotal,
     descuentoPct,
     montoDescuento,

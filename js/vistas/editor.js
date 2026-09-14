@@ -2,7 +2,7 @@
 // El orden importa: primero las cortinas (que es lo que se cotiza a diario) y
 // los datos del cliente arriba, plegados, para que no tapen lo principal.
 
-import { TIPOS, ARMADO, ARMADO_POR_TIPO, itemVacio, calcularItem, calcularTotales, hayPreciosCargados, descripcionItem, detallesTecnicos, admiteMotor, telasDeTipo, superficiePlaca, catalogoDe, sistemasElegibles, sistemaAuto } from '../calc.js';
+import { TIPOS, ARMADO, ARMADO_POR_TIPO, itemVacio, calcularItem, calcularTotales, hayPreciosCargados, descripcionItem, detallesTecnicos, admiteMotor, telasDeTipo, superficiePlaca, catalogoDe, sistemasElegibles, sistemaAuto, categoriaItem } from '../calc.js';
 import { estado } from '../store.js';
 import { el, esc, plata, num, leerNumero, hoyISO, aviso } from '../ui.js';
 import { armarMensaje, datosContado, copiar } from '../mensaje.js';
@@ -111,6 +111,10 @@ export function montarEditor(contenedor, doc, {
   // Placas y adicionales se arman con un catálogo de productos; las cortinas,
   // con los costos de telas y sistemas. Cambia el aviso de "faltan precios".
   const esCatalogo = tipoInicial === 'placa' || tipoInicial === 'adicional';
+  // De qué es este presupuesto. A uno de cortinas o de placas se le pueden
+  // enganchar adicionales, para cotizar las dos cosas en el mismo papel.
+  const categoriaEditor = categoriaItem({ tipo: tipoInicial });
+  const admiteAdicionales = categoriaEditor !== 'adicional';
 
   const modelo = JSON.parse(JSON.stringify(doc));
   if (!modelo.items?.length) modelo.items = [itemVacio(tipoInicial)];
@@ -152,7 +156,10 @@ export function montarEditor(contenedor, doc, {
         <span class="seccion-num">1</span><h2>${esc(tituloSeccion)}</h2>
       </div>
       <div data-items></div>
-      <button class="btn btn--chico" data-agregar style="width:100%">${esc(etiquetaAgregar)}</button>
+      <div class="fila-botones">
+        <button class="btn btn--chico" data-agregar="principal" style="flex:1">${esc(etiquetaAgregar)}</button>
+        ${admiteAdicionales ? '<button class="btn btn--chico btn--fantasma" data-agregar="adicional" title="Sumar un producto del catálogo de adicionales a este presupuesto">+ Agregar adicional</button>' : ''}
+      </div>
     </div>
 
     <div class="tarjeta">
@@ -278,8 +285,16 @@ export function montarEditor(contenedor, doc, {
 
   contenedor.querySelectorAll('[data-agregar]').forEach((b) =>
     b.addEventListener('click', () => {
-      const ultimo = modelo.items[modelo.items.length - 1];
-      const nuevo = itemVacio(ultimo?.tipo || tipoInicial);
+      const agregaAdicional = b.dataset.agregar === 'adicional';
+      if (agregaAdicional && !catalogoDe('adicional', estado.config).length) {
+        aviso('Todavía no cargaste adicionales. Andá a Ajustes para cargarlos.', 'error');
+        return;
+      }
+      // Se copia del último renglón de la misma clase: la cortina nueva sale de
+      // la última cortina aunque después venga un adicional, y al revés.
+      const categoria = agregaAdicional ? 'adicional' : categoriaEditor;
+      const ultimo = [...modelo.items].reverse().find((it) => categoriaItem(it) === categoria);
+      const nuevo = itemVacio(ultimo?.tipo || (agregaAdicional ? 'adicional' : tipoInicial));
       if (ultimo && (nuevo.tipo === 'placa' || nuevo.tipo === 'adicional')) {
         // Lo más común es seguir cargando el mismo producto y las mismas
         // opciones (colocación/envío) que el renglón anterior.
@@ -603,6 +618,7 @@ export function montarEditor(contenedor, doc, {
       <div class="cortina" data-id="${item.id}">
         <div class="cortina__cab">
           <span class="cortina__n">${String(indice + 1).padStart(2, '0')}</span>
+          <span class="chip chip--gris" style="font-size:.7rem">${esPlaca ? 'Placa' : 'Adicional'}</span>
           <input data-campo="ambiente" class="cortina__ambiente" placeholder="Ambiente (ej. Living, Dormitorio)" value="${esc(item.ambiente)}">
           <button class="btn-icono" data-quitar title="Quitar ${esPlaca ? 'placa' : 'adicional'}">&#10005;</button>
         </div>

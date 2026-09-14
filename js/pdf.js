@@ -3,8 +3,8 @@
 // En la compu: destino "Guardar como PDF".
 
 import { estado } from './store.js';
-import { calcularTotales, descripcionItem, detallesTecnicos, NOMBRE_TIPO } from './calc.js';
-import { plata, num, fecha, esc, sumarDias, ajuste, medidaTexto } from './ui.js';
+import { calcularTotales, descripcionItem, detallesTecnicos, NOMBRE_TIPO, CATEGORIA } from './calc.js';
+import { plata, num, fecha, esc, sumarDias, ajuste, medidaTexto, capitalizar } from './ui.js';
 import { datosContado } from './mensaje.js';
 import { totalPedido, cobrado, saldo, venta } from './dinero.js';
 
@@ -69,6 +69,10 @@ export function imprimirPresupuesto(p) {
   const dias = p.validezDias ?? emp.validezDias ?? 15;
   const validez = sumarDias(p.fecha, dias);
   const ctd = datosContado(p, estado.config, t.total);
+  // Título de la columna de descripción: "Cortina" si son todas cortinas,
+  // "Placa" o "Adicional" si son sólo eso, y "Producto" cuando se mezclan.
+  const categorias = Object.keys(t.unidades).filter((c) => t.unidades[c] > 0);
+  const columna = categorias.length === 1 ? capitalizar(CATEGORIA[categorias[0]].singular) : 'Producto';
 
   const html = `
     ${encabezado(emp)}
@@ -90,7 +94,7 @@ export function imprimirPresupuesto(p) {
       <thead>
         <tr>
           <th style="width:24%">Ambiente</th>
-          <th style="width:30%">Cortina</th>
+          <th style="width:30%">${esc(columna)}</th>
           <th class="num">Medidas</th>
           <th class="num">Cant.</th>
           <th class="num">Precio unit.</th>

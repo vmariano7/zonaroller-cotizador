@@ -11,7 +11,7 @@
 
 import { montarEditor, docVacio, CLIENTE_POR_DEFECTO } from './editor.js';
 import { guardar, obtener, proximoNumero } from '../store.js';
-import { CATEGORIA, categoriaDoc, contarItems } from '../calc.js';
+import { CATEGORIA, categoriaDoc, frasearUnidades } from '../calc.js';
 import { plata, aviso, confirmar, esc } from '../ui.js';
 import { navegar } from '../router.js';
 import { crearPedidoDesdePresupuesto } from './pedidos.js';
@@ -111,7 +111,7 @@ function renderPresupuesto(contenedor, params) {
   function pintarBarra() {
     const t = editor.totales();
     barra.innerHTML = `
-      <div class="resumen-fijo__fila"><span>${contarItems(t.cantidadCortinas, categoria)}</span><span>${t.montoDescuento ? `descuento ${plata(t.montoDescuento)}` : ''}</span></div>
+      <div class="resumen-fijo__fila"><span>${frasearUnidades(t.unidades)}</span><span>${t.montoDescuento ? `descuento ${plata(t.montoDescuento)}` : ''}</span></div>
       <div class="resumen-fijo__total"><span>Total</span><span>${plata(t.total)}</span></div>
       <div class="fila-botones mt-16">
         <button class="btn btn--primario" data-guardar style="flex:1">${existente ? 'Guardar cambios' : 'Guardar presupuesto'}</button>

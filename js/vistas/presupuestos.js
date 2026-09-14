@@ -1,7 +1,7 @@
 // Listado y detalle de presupuestos.
 
 import { estado, guardar, borrar, obtener, proximoNumero } from '../store.js';
-import { calcularTotales, descripcionItem, detallesTecnicos, categoriaDoc, contarItems, NOMBRE_TIPO } from '../calc.js';
+import { calcularTotales, descripcionItem, detallesTecnicos, frasearUnidades, unidadesDeDocs, NOMBRE_TIPO } from '../calc.js';
 import { plata, num, fecha, esc, aviso, confirmar, chip, vacio, ajuste, ESTADOS_PRESUPUESTO, sumarDias, medidaTexto } from '../ui.js';
 import { navegar } from '../router.js';
 import { imprimirPresupuesto } from '../pdf.js';
@@ -50,7 +50,7 @@ export function render(contenedor) {
 
     lista.innerHTML = items
       .map((p) => {
-        const cuenta = contarItems(p.cantidadCortinas, categoriaDoc(p));
+        const cuenta = frasearUnidades(unidadesDeDocs([p]));
         return `
       <div class="item-lista" data-id="${p.id}">
         <div class="item-lista__cuerpo">

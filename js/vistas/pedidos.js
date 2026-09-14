@@ -1,7 +1,7 @@
 // Pedidos confirmados: listado, alta desde cero o desde presupuesto, y detalle con pagos.
 
 import { estado, guardar, borrar, obtener, proximoNumero } from '../store.js';
-import { calcularTotales, descripcionItem, detallesTecnicos, CATEGORIA, categoriaDoc, contarItems, unidadesDeDocs, NOMBRE_TIPO } from '../calc.js';
+import { calcularTotales, descripcionItem, detallesTecnicos, CATEGORIA, categoriaDoc, frasearUnidades, unidadesDeDocs, NOMBRE_TIPO } from '../calc.js';
 import {
   plata, num, fecha, esc, aviso, confirmar, chip, vacio, modal, hoyISO, leerNumero, ESTADOS_PEDIDO, medidaTexto,
 } from '../ui.js';
@@ -161,7 +161,7 @@ export function render(contenedor) {
         <div class="kpi">
           <div class="kpi__etiqueta">Vendido</div>
           <div class="kpi__valor">${plata(vendido)}</div>
-          <div class="kpi__pie">${enRango.length} pedido${enRango.length === 1 ? '' : 's'} · ${unidadesDeDocs(enRango)}</div>
+          <div class="kpi__pie">${enRango.length} pedido${enRango.length === 1 ? '' : 's'} · ${frasearUnidades(unidadesDeDocs(enRango))}</div>
         </div>
         <div class="kpi">
           <div class="kpi__etiqueta">Costo abonado</div>
@@ -294,7 +294,7 @@ export function renderEditor(contenedor, params = {}) {
   function pintarBarra() {
     const t = editor.totales();
     barra.innerHTML = `
-      <div class="resumen-fijo__fila"><span>${contarItems(t.cantidadCortinas, categoria)}</span><span></span></div>
+      <div class="resumen-fijo__fila"><span>${frasearUnidades(t.unidades)}</span><span></span></div>
       <div class="resumen-fijo__total"><span>Total</span><span>${plata(t.total)}</span></div>
       <div class="fila-botones mt-16">
         <button class="btn btn--primario" data-guardar style="flex:1">${existente ? 'Guardar cambios' : 'Crear pedido'}</button>
@@ -369,7 +369,7 @@ export function renderDetalle(contenedor, params) {
       <div class="kpi"><div class="kpi__etiqueta">Total</div><div class="kpi__valor">${plata(cobra)}</div><div class="kpi__pie">${v.modo === 'contado' ? 'precio de contado' : 'precio de lista'}${v.redondeo ? ' · redondeado' : ''}</div></div>
       <div class="kpi kpi--verde"><div class="kpi__etiqueta">Cobrado</div><div class="kpi__valor">${plata(pagado)}</div></div>
       <div class="kpi ${debe > 0 ? 'kpi--rojo' : 'kpi--verde'}"><div class="kpi__etiqueta">Saldo</div><div class="kpi__valor">${plata(debe)}</div></div>
-      <div class="kpi"><div class="kpi__etiqueta">Instalación a pagar</div><div class="kpi__valor">${plata(p.instalacionPagada ? 0 : t.costoInstalacion)}</div><div class="kpi__pie">${p.instalacionPagada ? 'ya pagada' : contarItems(t.cantidadCortinas, categoria)}</div></div>
+      <div class="kpi"><div class="kpi__etiqueta">Instalación a pagar</div><div class="kpi__valor">${plata(p.instalacionPagada ? 0 : t.costoInstalacion)}</div><div class="kpi__pie">${p.instalacionPagada ? 'ya pagada' : frasearUnidades(t.unidades)}</div></div>
     </div>
 
     <div class="tarjeta">

@@ -3,7 +3,7 @@
 // una vez, el cliente ya existe.
 
 import { estado } from '../store.js';
-import { calcularTotales, categoriaDoc, categoriaItem, materialItem, contarItems, frasearUnidades } from '../calc.js';
+import { calcularTotales, categoriaItem, materialItem, contarItems, frasearUnidades, unidadesDeDocs } from '../calc.js';
 import { plata, fecha, esc, chip, vacio, ESTADOS_PRESUPUESTO, ESTADOS_PEDIDO } from '../ui.js';
 import { navegar } from '../router.js';
 import { totalPedido, cobrado, saldo } from '../dinero.js';
@@ -63,8 +63,7 @@ export function listarClientes() {
       if (doc.estado !== 'cancelado') {
         c.comprado += totalPedido(doc);
         c.debe += Math.max(0, saldo(doc));
-        const cat = categoriaDoc(doc);
-        c.unidades[cat] = (c.unidades[cat] || 0) + (doc.cantidadCortinas || 0);
+        Object.entries(unidadesDeDocs([doc])).forEach(([cat, n]) => { c.unidades[cat] = (c.unidades[cat] || 0) + n; });
       }
     }
   };
@@ -218,7 +217,7 @@ export function renderDetalle(contenedor, params) {
             <div class="item-lista" data-ir="/pedido/${p.id}">
               <div class="item-lista__cuerpo">
                 <div class="item-lista__titulo">${esc(p.numero)} ${chip(ESTADOS_PEDIDO, p.estado)}</div>
-                <div class="mini">${fecha(p.fecha)} · ${contarItems(p.cantidadCortinas || 0, categoriaDoc(p))}${saldo(p) > 0 ? ` · debe ${plata(saldo(p))}` : ''}</div>
+                <div class="mini">${fecha(p.fecha)} · ${frasearUnidades(unidadesDeDocs([p]))}${saldo(p) > 0 ? ` · debe ${plata(saldo(p))}` : ''}</div>
               </div>
               <div class="item-lista__monto">${plata(totalPedido(p))}</div>
             </div>`).join('')}</div>` : '<div class="mini">Todavía no te compró.</div>'}
@@ -232,7 +231,7 @@ export function renderDetalle(contenedor, params) {
             <div class="item-lista" data-ir="/presupuesto/${p.id}">
               <div class="item-lista__cuerpo">
                 <div class="item-lista__titulo">${esc(p.numero)} ${chip(ESTADOS_PRESUPUESTO, p.estado)}</div>
-                <div class="mini">${fecha(p.fecha)} · ${contarItems(p.cantidadCortinas || 0, categoriaDoc(p))}</div>
+                <div class="mini">${fecha(p.fecha)} · ${frasearUnidades(unidadesDeDocs([p]))}</div>
               </div>
               <div class="item-lista__monto">${plata(p.total)}</div>
             </div>`).join('')}</div>` : '<div class="mini">Sin presupuestos.</div>'}

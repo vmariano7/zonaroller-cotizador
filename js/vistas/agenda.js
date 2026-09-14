@@ -1,7 +1,7 @@
 // Agenda: calendario mensual con visitas a domicilio, instalaciones y tareas.
 
 import { estado, guardar, borrar } from '../store.js';
-import { categoriaDoc, contarItems } from '../calc.js';
+import { frasearUnidades, unidadesDeDocs } from '../calc.js';
 import { fechaLarga, capitalizar, esc, aviso, confirmar, modal, hoyISO } from '../ui.js';
 import { navegar } from '../router.js';
 
@@ -37,7 +37,7 @@ function eventosDe(fechaISO) {
       cliente: p.cliente?.nombre || '',
       direccion: p.cliente?.direccion || '',
       telefono: p.cliente?.telefono || '',
-      notas: `${p.numero} · ${contarItems(p.cantidadCortinas || 0, categoriaDoc(p))}`,
+      notas: `${p.numero} · ${frasearUnidades(unidadesDeDocs([p]))}`,
       hecho: p.estado === 'instalado',
       origen: 'pedido',
       pedidoId: p.id,
