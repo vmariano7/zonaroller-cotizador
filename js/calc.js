@@ -215,6 +215,11 @@ export function configVacia() {
     // Lo que te sale el instalador. Se traslada al precio final de la cortina:
     // al cliente no se le cobra aparte, ya viene adentro. Ver costoInstaladorItem.
     instalador: { roller: 15000, vertical: 20000, panel_oriental: 0, recargoPct: 50 },
+    // Cortina "solo tela": el cliente ya tiene el sistema y se le vende la tela
+    // sola. Es un descuento fijo, igual para todos los modelos, que se resta
+    // del precio de contado (el de lista sale de ahí). El importe real se
+    // carga en Ajustes. Ver calcularItem.
+    soloTelaDescuento: 0,
     // Lo que te sale el motor de una roller automatizada. Va a precio de costo,
     // sin incremento: se suma después de la ganancia, igual que la instalación.
     // El importe real se carga en Ajustes, no vive en el código.
@@ -281,6 +286,7 @@ export function itemVacio(tipo = 'roller') {
       altoM: null,
       cantidad: 1,
       instalacion: true,
+      soloTela: false,
       detalle: '',
     };
   }
@@ -294,6 +300,7 @@ export function itemVacio(tipo = 'roller') {
     cantidad: 1,
     sistemaKey: null, // null = automático según tipo y tela
     instalacion: true,
+    soloTela: false, // el cliente pone el sistema: se vende la tela sola, con descuento fijo
     ...(admiteMotor(tipo) ? { automatizada: false } : {}),
     // Armado: arranca vacío, se elige cortina por cortina. Al agregar otra
     // cortina el editor copia lo que hayas puesto en la anterior.
@@ -529,6 +536,14 @@ export function sistemaAuto(tipo, tela, config) {
   return `${tipo}_${sufijo}`;
 }
 
+/**
+ * Lo que se descuenta a una cortina marcada "solo tela": un importe fijo que
+ * se resta del contado, igual para todos los modelos. Sale de Ajustes.
+ */
+function descuentoSoloTela(item, config) {
+  return item?.soloTela ? Number(config?.soloTelaDescuento) || 0 : 0;
+}
+
 function redondear(valor, multiplo) {
   if (!multiplo || multiplo <= 0) return valor;
   return Math.round(valor / multiplo) * multiplo;
@@ -594,18 +609,25 @@ export function calcularItem(item, config, contexto = {}) {
   // arriba con la tela y el sistema.
   const costoMotorUnit = costoMotorItem(item, config);
 
+  // "Solo tela": la cuenta se hace completa y se le resta un fijo. No baja
+  // de cero por más chica que sea la cortina.
+  const soloTela = !!item.soloTela;
+  const descSoloTela = descuentoSoloTela(item, config);
+
   // Lo que necesitás cobrar: eso es el contado. El precio de lista lo aguanta
   // con el descuento puesto encima.
-  const contadoUnit = conIncremento + costoInstaladorUnit + costoMotorUnit;
+  const contadoUnit = Math.max(0, conIncremento + costoInstaladorUnit + costoMotorUnit - descSoloTela);
 
   const fijado = item.precioFijado != null && Number.isFinite(Number(item.precioFijado));
   const precioUnitario = fijado
     ? Number(item.precioFijado)
     : redondear(contadoUnit * factorLista(config), config.redondeo);
 
+  // Si va sin sistema, el sistema no se compra: no es costo.
+  const costoMateriales = soloTela ? costoTela : base;
   const costoPropio = item.costoFijado != null && Number.isFinite(Number(item.costoFijado))
     ? (Number(item.costoFijado) + costoInstaladorUnit + costoMotorUnit) * cantidad
-    : (base + costoInstaladorUnit + costoMotorUnit) * cantidad;
+    : (costoMateriales + costoInstaladorUnit + costoMotorUnit) * cantidad;
 
   return {
     fijado,
@@ -616,6 +638,8 @@ export function calcularItem(item, config, contexto = {}) {
     altoM,
     cantidad,
     precioTela,
+    soloTela,
+    descuentoSoloTela: descSoloTela,
     sistemaKey,
     sistemaNombre: nombreSistema(sistemaKey, config),
     precioSistema,
@@ -788,10 +812,14 @@ function calcularItemTelaTradicional(item, config, contexto = {}) {
     ? Number(item.costoInstaladorFijado)
     : costoInstaladorItem(item, config, contexto);
 
+  const soloTela = !!item.soloTela;
+  const descSoloTela = descuentoSoloTela(item, config);
+  const contadoUnit = Math.max(0, conIncremento + costoInstaladorUnit - descSoloTela);
+
   const fijado = item.precioFijado != null && Number.isFinite(Number(item.precioFijado));
   const precioUnitario = fijado
     ? Number(item.precioFijado)
-    : redondear((conIncremento + costoInstaladorUnit) * factorLista(config), config.redondeo);
+    : redondear(contadoUnit * factorLista(config), config.redondeo);
 
   const costoPropio = item.costoFijado != null && Number.isFinite(Number(item.costoFijado))
     ? (Number(item.costoFijado) + costoInstaladorUnit) * cantidad
@@ -806,6 +834,8 @@ function calcularItemTelaTradicional(item, config, contexto = {}) {
     altoM,
     cantidad,
     precioTela: 0,
+    soloTela,
+    descuentoSoloTela: descSoloTela,
     sistemaKey: null,
     sistemaNombre: item.riel || '',
     precioSistema: 0,

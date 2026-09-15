@@ -105,7 +105,7 @@ export function imprimirPresupuesto(p) {
         ${t.lineas.map(({ item, calc }) => `
           <tr>
             <td>${esc(item.ambiente || '—')}</td>
-            <td>${esc(descripcionItem(item) || `${NOMBRE_TIPO[item.tipo] || item.tipo} · ${item.tela}`)}${calc.automatizada ? '<br><span style="font-size:8pt">Automatizada, con motor</span>' : ''}${item.tipo === 'placa' ? detallesTecnicos(item).map((d) => `<br><span style="font-size:8pt">${esc(d)}</span>`).join('') : ''}${item.detalle ? `<br><span style="font-size:8pt">${esc(item.detalle)}</span>` : ''}${item.instalacion ? '<br><span style="font-size:8pt">Instalación sin cargo</span>' : ''}</td>
+            <td>${esc(descripcionItem(item) || `${NOMBRE_TIPO[item.tipo] || item.tipo} · ${item.tela}`)}${calc.soloTela ? '<br><span style="font-size:8pt">Solo tela</span>' : ''}${calc.automatizada ? '<br><span style="font-size:8pt">Automatizada, con motor</span>' : ''}${item.tipo === 'placa' ? detallesTecnicos(item).map((d) => `<br><span style="font-size:8pt">${esc(d)}</span>`).join('') : ''}${item.detalle ? `<br><span style="font-size:8pt">${esc(item.detalle)}</span>` : ''}${item.instalacion ? '<br><span style="font-size:8pt">Instalación sin cargo</span>' : ''}</td>
             <td class="num">${medidaTexto(item, calc)}</td>
             <td class="num">${calc.cantidad}</td>
             <td class="num">${plata(calc.precioUnitario)}</td>
@@ -200,7 +200,7 @@ export function imprimirOrdenTrabajo(p) {
             <td class="num"><strong>${ancho}</strong></td>
             <td class="num"><strong>${alto}</strong></td>
             <td class="num">${calc.cantidad}</td>
-            <td style="font-size:8.5pt">${esc(calc.sistemaNombre)}</td>
+            <td style="font-size:8.5pt">${calc.soloTela ? '<strong>Solo tela</strong> (sin sistema)' : esc(calc.sistemaNombre)}</td>
             <td style="font-size:8.5pt">${esc(detalle)}</td>
           </tr>`;
         }).join('')}

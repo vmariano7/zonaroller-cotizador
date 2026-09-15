@@ -451,6 +451,13 @@ export function montarEditor(contenedor, doc, {
             </label>
             <span>La instalamos nosotros <span class="mini">(ya viene dentro del precio)</span></span>
           </div>
+          <div class="check mt-16">
+            <label class="switch">
+              <input type="checkbox" data-campo="soloTela"${item.soloTela ? ' checked' : ''}>
+              <span class="switch__pista"></span>
+            </label>
+            <span>Solo tela, sin sistema <span class="mini">(se descuentan ${plata(Number(config.soloTelaDescuento) || 0)} del contado)</span></span>
+          </div>
           ${admiteMotor(item.tipo) ? `
           <div class="check mt-16">
             <label class="switch">
@@ -503,6 +510,7 @@ export function montarEditor(contenedor, doc, {
           ambiente: item.ambiente,
           cantidad: item.cantidad,
           instalacion: item.instalacion,
+          soloTela: !!item.soloTela,
           detalle: item.detalle,
           // Solo la roller se automatiza, pero el tilde se recuerda: si volvés
           // a roller después de mirar otro tipo, sigue puesto.
@@ -566,14 +574,17 @@ export function montarEditor(contenedor, doc, {
     const partes = [];
     let sinPrecio = false;
 
+    const soloTela = c.soloTela ? `solo tela <span class="mini">(sin sistema, −${plata(c.descuentoSoloTela)})</span>` : null;
     if (item.tipo === 'tela_tradicional') {
       partes.push(`${num(c.anchoM)} × ${num(c.altoM)} m`);
       if (item.recogimiento) partes.push(esc(item.recogimiento));
+      if (soloTela) partes.push(soloTela);
       const descripcion = descripcionItem(item);
       if (descripcion) partes.unshift(`<span class="mini">${esc(descripcion)}</span>`);
     } else {
       partes.push(`${num(c.m2)} m²${c.aplicaMinimo ? ' <span class="mini">(mínimo)</span>' : ''}`);
       partes.push(`sistema ${esc(c.sistemaNombre || '—')}`);
+      if (soloTela) partes.push(soloTela);
       if (c.incrementoPct) partes.push(`+${num(c.incrementoPct, 0)}%`);
       sinPrecio = c.precioTela === 0 || c.precioSistema === 0;
     }

@@ -180,6 +180,22 @@ export function render(contenedor) {
           igual que la instalación: en una venta de contado lo recuperás exacto. Se activa
           cortina por cortina, con el tilde <em>Automatizada</em> en Opciones avanzadas.</div>
         </div>
+
+        <div style="border-top:2px solid var(--linea-fuerte);margin:1rem 0 .8rem"></div>
+
+        <h3 style="margin-bottom:.5rem">Solo tela <span class="mini" style="font-weight:400">(cortina sin sistema)</span></h3>
+        <div class="campo" style="display:flex;align-items:center;gap:.6rem">
+          <label style="flex:1;margin:0;font-weight:500;color:var(--acento)">Descuento por cortina</label>
+          <div class="con-prefijo" style="width:140px"><span>$</span>
+            <input type="number" inputmode="decimal" min="0" step="1" data-num="soloTelaDescuento" value="${c.soloTelaDescuento ?? 0}">
+          </div>
+        </div>
+        <div class="banner banner--info" style="margin-top:.8rem">
+          <div>Para cuando el cliente ya tiene el sistema y se le vende la tela sola. Es un
+          importe <strong>fijo, igual para todos los modelos</strong>: se resta del precio de
+          contado y el de lista sale de ahí. Se activa cortina por cortina, con el tilde
+          <em>Solo tela</em> en Opciones avanzadas, y el presupuesto lo aclara.</div>
+        </div>
       </div>
 
       <div>
