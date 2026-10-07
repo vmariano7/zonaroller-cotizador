@@ -37,7 +37,7 @@ export const estado = {
   pedidos: [],
   agenda: [],
   movimientos: [],
-  sesion: { activa: false, email: '' },
+  sesion: { activa: false, email: '', rol: '' },
   sync: { activa: false, estado: 'local', mensaje: 'Guardando solo en este dispositivo', ultima: null },
 };
 
@@ -67,6 +67,21 @@ export function leerSesion() {
   }
 }
 
+/**
+ * El rol del usuario, que decide qué pantallas ve (ver permisos.js). Sale de
+ * `app_metadata`, que sólo se edita desde el panel de Supabase: el propio
+ * usuario no puede cambiárselo con su token. Si no dice nada, es el dueño.
+ */
+function rolDelToken(access_token) {
+  try {
+    const cuerpo = String(access_token || '').split('.')[1];
+    const json = JSON.parse(atob(cuerpo.replace(/-/g, '+').replace(/_/g, '/')));
+    return String(json?.app_metadata?.rol || '');
+  } catch {
+    return '';
+  }
+}
+
 /** Guarda lo que devuelve Supabase y anota cuándo hay que renovar. */
 function anotarSesion(datos, email) {
   const sesion = {
@@ -75,15 +90,16 @@ function anotarSesion(datos, email) {
     // Un minuto de colchón: no queremos usar un token que vence en el camino.
     expira: Date.now() + (Number(datos.expires_in) || 3600) * 1000 - 60000,
     email: datos.user?.email || email || '',
+    rol: String(datos.user?.app_metadata?.rol || '') || rolDelToken(datos.access_token),
   };
   localStorage.setItem(CLAVE_SESION, JSON.stringify(sesion));
-  estado.sesion = { activa: true, email: sesion.email };
+  estado.sesion = { activa: true, email: sesion.email, rol: sesion.rol };
   return sesion;
 }
 
 export function cerrarSesion() {
   localStorage.removeItem(CLAVE_SESION);
-  estado.sesion = { activa: false, email: '' };
+  estado.sesion = { activa: false, email: '', rol: '' };
   estado.sync = { activa: false, estado: 'local', mensaje: 'Sin sesión — guardando solo en este dispositivo', ultima: null };
   avisar();
 }
@@ -182,7 +198,7 @@ export async function iniciar() {
   }
 
   const s = leerSesion();
-  estado.sesion = { activa: !!s, email: s?.email || '' };
+  estado.sesion = { activa: !!s, email: s?.email || '', rol: s?.rol || rolDelToken(s?.access_token) };
   avisar();
 
   if (s) await sincronizar();

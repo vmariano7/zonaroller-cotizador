@@ -5,6 +5,7 @@ import { definirRutas, iniciarRouter, recargarVista } from './router.js';
 import { $, $$, esc, aviso, modal } from './ui.js';
 import { tienePin, estaDesbloqueado, pedirPin, bloquear } from './candado.js';
 import { pedirIngreso } from './ingreso.js';
+import { puede, NOMBRE_ROL, rolActual } from './permisos.js';
 
 import * as vCotizar from './vistas/cotizar.js';
 import * as vPresupuestos from './vistas/presupuestos.js';
@@ -36,11 +37,23 @@ const PRIMARIAS = [
 ];
 // El resto entra por "Más" en el celular; en la compu se ven todas.
 const SECUNDARIAS = [
-  { nav: 'caja', ruta: '/caja', texto: 'Caja' },
+  { nav: 'caja', ruta: '/caja', texto: 'Caja', permiso: 'caja' },
   { nav: 'clientes', ruta: '/clientes', texto: 'Clientes' },
-  { nav: 'reportes', ruta: '/reportes', texto: 'Reportes' },
-  { nav: 'config', ruta: '/config', texto: 'Ajustes' },
+  { nav: 'reportes', ruta: '/reportes', texto: 'Reportes', permiso: 'reportes' },
+  { nav: 'config', ruta: '/config', texto: 'Ajustes', permiso: 'ajustes' },
 ];
+
+/** Las secciones que este rol puede abrir. Ver permisos.js. */
+const visibles = (lista) => lista.filter((n) => !n.permiso || puede(n.permiso));
+
+/**
+ * Una pantalla que este rol no abre. No alcanza con sacarla del menú: la
+ * dirección se puede escribir a mano o quedar guardada en un favorito.
+ */
+const protegida = (permiso, vista) => (contenedor, params) => {
+  if (puede(permiso)) return vista(contenedor, params);
+  contenedor.innerHTML = '<div class="vacio"><p>Esta sección es solo para el dueño.</p><a class="btn" href="#/cotizar">Ir al cotizador</a></div>';
+};
 
 const icono = (nombre) =>
   `<svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round">${ICONOS[nombre]}</svg>`;
@@ -57,28 +70,34 @@ definirRutas([
   { patron: '/pedido/:id', nav: 'pedidos', vista: vPedidos.renderDetalle },
   { patron: '/clientes', nav: 'clientes', vista: vClientes.render },
   { patron: '/cliente/:clave', nav: 'clientes', vista: vClientes.renderDetalle },
-  { patron: '/caja', nav: 'caja', vista: vCaja.render },
+  { patron: '/caja', nav: 'caja', vista: protegida('caja', vCaja.render) },
   { patron: '/agenda', nav: 'agenda', vista: vAgenda.render },
-  { patron: '/reportes', nav: 'reportes', vista: vReportes.render },
-  { patron: '/config', nav: 'config', vista: vConfig.render },
+  { patron: '/reportes', nav: 'reportes', vista: protegida('reportes', vReportes.render) },
+  { patron: '/config', nav: 'config', vista: protegida('ajustes', vConfig.render) },
 ]);
+
+// Qué sección está marcada en el menú. Se guarda porque el menú se vuelve a
+// armar cuando cambia quién entró, y ahí hay que volver a marcarla.
+let navActivo = '';
 
 function pintarNav() {
   const enlace = (n, secundaria) =>
     `<a href="#${n.ruta}" data-nav="${n.nav}"${secundaria ? ' class="nav__sec"' : ''}>${icono(n.nav)}<span>${esc(n.texto)}</span></a>`;
 
   $('#nav').innerHTML = `
-    ${PRIMARIAS.map((n) => enlace(n, false)).join('')}
-    ${SECUNDARIAS.map((n) => enlace(n, true)).join('')}
+    ${visibles(PRIMARIAS).map((n) => enlace(n, false)).join('')}
+    ${visibles(SECUNDARIAS).map((n) => enlace(n, true)).join('')}
     <button class="nav__mas" data-mas>${icono('mas')}<span>Más</span></button>`;
 
   $('#nav [data-mas]').addEventListener('click', abrirMas);
+  marcarNav(navActivo);
 }
 
 function abrirMas() {
   const m = modal('Más', `
+    <div class="mini mb-16">${esc(estado.sesion.email || 'Sin sesión')}${estado.sesion.activa ? ` · ${esc(NOMBRE_ROL[rolActual()])}` : ''}</div>
     <div class="lista">
-      ${SECUNDARIAS.map(
+      ${visibles(SECUNDARIAS).map(
         (n) => `<a class="item-lista" href="#${n.ruta}" data-cerrar style="text-decoration:none;color:inherit">
           <span style="width:22px;display:grid;place-items:center">${icono(n.nav)}</span>
           <div class="item-lista__cuerpo"><div class="item-lista__titulo">${esc(n.texto)}</div></div>
@@ -92,8 +111,9 @@ function abrirMas() {
 }
 
 function marcarNav(activo) {
+  navActivo = activo;
   $$('#nav a').forEach((a) => a.classList.toggle('activo', a.dataset.nav === activo));
-  const esSecundaria = SECUNDARIAS.some((n) => n.nav === activo);
+  const esSecundaria = visibles(SECUNDARIAS).some((n) => n.nav === activo);
   $('#nav [data-mas]')?.classList.toggle('activo', esSecundaria);
 }
 
@@ -115,6 +135,9 @@ async function arrancar() {
   if (!leerSesion()) await pedirIngreso();
   await iniciar();
   pintarSync();
+  // Recién ahora se sabe quién entró, así que el menú se arma de nuevo con las
+  // secciones que le correspondan.
+  pintarNav();
 
   if (tienePin() && !estaDesbloqueado()) await pedirPin();
 
@@ -126,6 +149,8 @@ async function arrancar() {
     if (!leerSesion()) {
       await pedirIngreso({ vencida: true });
       await sincronizar();
+      // Puede haber entrado otra persona, con otras secciones a la vista.
+      pintarNav();
       recargarVista();
       return;
     }

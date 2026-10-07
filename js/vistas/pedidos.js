@@ -6,6 +6,7 @@ import {
   plata, num, fecha, esc, aviso, confirmar, chip, vacio, modal, hoyISO, leerNumero, ESTADOS_PEDIDO, medidaTexto,
 } from '../ui.js';
 import { navegar } from '../router.js';
+import { puede } from '../permisos.js';
 import { imprimirOrdenTrabajo } from '../pdf.js';
 import { imprimirRecibo } from '../recibo.js';
 import { montarEditor, docVacio } from './editor.js';
@@ -99,6 +100,7 @@ export function render(contenedor) {
         <a class="btn btn--primario" href="#/pedido-nuevo">+ Pedido desde cero</a>
       </div>
     </div>
+    ${puede('resumenVentas') ? `
     <div class="tarjeta mb-16">
       <div class="tarjeta__cab">
         <h2>Resumen de venta</h2>
@@ -113,7 +115,7 @@ export function render(contenedor) {
         <div><label for="rs-hasta">Hasta</label><input id="rs-hasta" type="date" data-hasta></div>
       </div>
       <div class="mt-16" data-resumen></div>
-    </div>
+    </div>` : ''}
 
     <div class="campos campos--2 mb-16">
       <input data-buscar placeholder="Buscar por cliente, número o dirección…">
@@ -190,22 +192,26 @@ export function render(contenedor) {
     pintarResumen();
   }
 
-  contenedor.querySelectorAll('[data-rango] button').forEach((b) =>
-    b.addEventListener('click', () => {
-      contenedor.querySelectorAll('[data-rango] button').forEach((o) => o.setAttribute('aria-pressed', String(o === b)));
-      aplicarRango(b.dataset.v);
-    })
-  );
+  // El resumen del período no está para todos los roles: si no se pintó, no
+  // hay nada que cablear.
+  if (cajaResumen) {
+    contenedor.querySelectorAll('[data-rango] button').forEach((b) =>
+      b.addEventListener('click', () => {
+        contenedor.querySelectorAll('[data-rango] button').forEach((o) => o.setAttribute('aria-pressed', String(o === b)));
+        aplicarRango(b.dataset.v);
+      })
+    );
 
-  // Tocar las fechas a mano deselecciona los atajos: ya no es "este mes".
-  [inputDesde, inputHasta].forEach((inp) =>
-    inp.addEventListener('change', () => {
-      contenedor.querySelectorAll('[data-rango] button').forEach((o) => o.setAttribute('aria-pressed', 'false'));
-      pintarResumen();
-    })
-  );
+    // Tocar las fechas a mano deselecciona los atajos: ya no es "este mes".
+    [inputDesde, inputHasta].forEach((inp) =>
+      inp.addEventListener('change', () => {
+        contenedor.querySelectorAll('[data-rango] button').forEach((o) => o.setAttribute('aria-pressed', 'false'));
+        pintarResumen();
+      })
+    );
 
-  aplicarRango('mes');
+    aplicarRango('mes');
+  }
 
   function pintar() {
     const q = inputBuscar.value.trim().toLowerCase();
@@ -439,6 +445,7 @@ export function renderDetalle(contenedor, params) {
       </div>
     </div>
 
+    ${puede('costos') ? `
     <div class="tarjeta">
       <div class="tarjeta__cab">
         <h2>Qué te salió este pedido</h2>
@@ -467,7 +474,7 @@ export function renderDetalle(contenedor, params) {
           </div>
         </div>
       </div>
-    </div>
+    </div>` : ''}
 
     <div class="tarjeta">
       <div class="tarjeta__cab"><h2>${cat.titulo}</h2></div>
@@ -588,7 +595,7 @@ export function renderDetalle(contenedor, params) {
   });
 
   // El costo se guarda al salir del campo. Vacío = volver al calculado.
-  contenedor.querySelector('[data-costo]').addEventListener('change', async (e) => {
+  contenedor.querySelector('[data-costo]')?.addEventListener('change', async (e) => {
     const crudo = e.target.value.trim();
     const valor = crudo === '' ? null : Number(crudo);
     if (valor !== null && (!Number.isFinite(valor) || valor < 0)) {
