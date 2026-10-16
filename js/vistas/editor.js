@@ -2,7 +2,7 @@
 // El orden importa: primero las cortinas (que es lo que se cotiza a diario) y
 // los datos del cliente arriba, plegados, para que no tapen lo principal.
 
-import { TIPOS, ARMADO, ARMADO_POR_TIPO, itemVacio, calcularItem, calcularTotales, hayPreciosCargados, descripcionItem, detallesTecnicos, admiteMotor, telasDeTipo, catalogoDe, sistemasElegibles, sistemaAuto, categoriaItem } from '../calc.js';
+import { TIPOS, ARMADO, ARMADO_POR_TIPO, itemVacio, calcularItem, calcularTotales, hayPreciosCargados, descripcionItem, detallesTecnicos, admiteMotor, telasDeTipo, coloresDeTela, coloresDeSistema, sistemaConColor, catalogoDe, sistemasElegibles, sistemaAuto, categoriaItem } from '../calc.js';
 import { estado } from '../store.js';
 import { el, esc, plata, num, leerNumero, hoyISO, aviso } from '../ui.js';
 import { armarMensaje, datosContado, copiar } from '../mensaje.js';
@@ -301,6 +301,9 @@ export function montarEditor(contenedor, doc, {
         nuevo.producto = ultimo.producto;
       } else if (ultimo) {
         nuevo.tela = ultimo.tela;
+        nuevo.telaColor = ultimo.telaColor || nuevo.telaColor;
+        if (ultimo.sistemaKey) nuevo.sistemaKey = ultimo.sistemaKey;
+        nuevo.sistemaColor = ultimo.sistemaColor || nuevo.sistemaColor;
         // El armado se repite entre cortinas de la misma casa casi siempre.
         (ARMADO_POR_TIPO[nuevo.tipo] || []).forEach((k) => { if (ultimo[k]) nuevo[k] = ultimo[k]; });
       }
@@ -324,8 +327,17 @@ export function montarEditor(contenedor, doc, {
 
     const config = estado.config;
     const esTelaTradicional = item.tipo === 'tela_tradicional';
-    const telas = esTelaTradicional ? (TIPOS.tela_tradicional.telas || []) : telasDeTipo(item.tipo, config);
-    if (!telas.includes(item.tela)) item.tela = telas[0] || '';
+    // En tela tradicional la lista es de nombres sueltos; en el resto cada tela
+    // trae sus colores.
+    const telas = esTelaTradicional
+      ? (TIPOS.tela_tradicional.telas || []).map((n) => ({ nombre: n, colores: [] }))
+      : telasDeTipo(item.tipo, config);
+    if (!telas.some((t) => t.nombre === item.tela)) item.tela = telas[0]?.nombre || '';
+    // Los colores de la tela elegida. Si el renglón viene de antes (o se cambió
+    // de tela), se pone el primero, que es el que usamos de preseleccionado.
+    const coloresTela = esTelaTradicional ? [] : coloresDeTela(item.tipo, item.tela, config);
+    if (coloresTela.length && !coloresTela.includes(item.telaColor)) item.telaColor = coloresTela[0];
+    if (!coloresTela.length) item.telaColor = '';
 
     if (esTelaTradicional) {
       const t = TIPOS.tela_tradicional;
@@ -355,14 +367,46 @@ export function montarEditor(contenedor, doc, {
     const campoAncho = campoMedida('anchoM', 'anchoCm');
     const campoAlto = campoMedida('altoM', 'altoCm');
 
-    const camposMedidas = `
-        <div class="campos campos--4 mt-16">
+    const selectTela = `
           <div>
             <label>Tipo de tela</label>
             <select data-campo="tela">
-              ${telas.map((t) => `<option value="${esc(t)}"${item.tela === t ? ' selected' : ''}>${esc(t)}</option>`).join('')}
+              ${telas.map((t) => `<option value="${esc(t.nombre)}"${item.tela === t.nombre ? ' selected' : ''}>${esc(t.nombre)}</option>`).join('')}
             </select>
+          </div>`;
+    // El color de la tela puede mover el precio (en Sun Screen 5% cada grupo de
+    // colores sale distinto), así que va al lado de la tela y no adentro de las
+    // opciones avanzadas.
+    const selectColorTela = coloresTela.length ? `
+          <div>
+            <label>Color</label>
+            <select data-campo="telaColor">
+              ${coloresTela.map((cl) => `<option value="${esc(cl)}"${item.telaColor === cl ? ' selected' : ''}>${esc(cl)}</option>`).join('')}
+            </select>
+          </div>` : '';
+
+    const camposMedidas = coloresTela.length ? `
+        <div class="campos campos--2 mt-16">
+          ${selectTela}
+          ${selectColorTela}
+        </div>
+        <div class="campos campos--3 mt-16">
+          <div>
+            <label>Ancho</label>
+            <div class="con-sufijo">${campoAncho}</div>
           </div>
+          <div>
+            <label>Alto</label>
+            <div class="con-sufijo">${campoAlto}</div>
+          </div>
+          <div>
+            <label>Cantidad</label>
+            <input data-campo="cantidad" type="number" inputmode="numeric" min="1" step="1" value="${item.cantidad || 1}">
+          </div>
+        </div>
+    ` : `
+        <div class="campos campos--4 mt-16">
+          ${selectTela}
           <div>
             <label>Ancho</label>
             <div class="con-sufijo">${campoAncho}</div>
@@ -378,20 +422,30 @@ export function montarEditor(contenedor, doc, {
         </div>
     `;
 
-    // Los paneles orientales se hacen con tres sistemas distintos, cada uno con
-    // su costo: hay que elegirlo a mano. En los demás tipos lo decide la tela,
-    // así que este bloque no aparece. Va afuera de las opciones avanzadas
-    // porque mueve el precio.
+    // Roller y paneles orientales se hacen con varios sistemas, cada uno con su
+    // costo: hay que elegirlo a mano. En los demás tipos lo decide la tela, así
+    // que este bloque no aparece. Va afuera de las opciones avanzadas porque
+    // mueve el precio.
     const elegibles = sistemasElegibles(item.tipo, config);
     const sistemaActual = item.sistemaKey || sistemaAuto(item.tipo, item.tela, config);
+    const coloresSistema = elegibles.length ? coloresDeSistema(sistemaActual, config) : [];
+    if (coloresSistema.length && !coloresSistema.includes(item.sistemaColor)) item.sistemaColor = coloresSistema[0];
+    if (!coloresSistema.length) item.sistemaColor = '';
     const campoSistema = elegibles.length ? `
-        <div class="campos campos--4 mt-16">
+        <div class="campos campos--2 mt-16">
           <div>
             <label>Sistema</label>
             <select data-campo="sistemaKey">
               ${elegibles.map((s) => `<option value="${esc(s.id)}"${s.id === sistemaActual ? ' selected' : ''}>${esc(s.nombre)}</option>`).join('')}
             </select>
           </div>
+          ${coloresSistema.length ? `
+          <div>
+            <label>Color del sistema</label>
+            <select data-campo="sistemaColor">
+              ${coloresSistema.map((cl) => `<option value="${esc(cl)}"${item.sistemaColor === cl ? ' selected' : ''}>${esc(cl)}</option>`).join('')}
+            </select>
+          </div>` : ''}
         </div>
     ` : '';
 
@@ -519,6 +573,15 @@ export function montarEditor(contenedor, doc, {
       const campo = inp.dataset.campo;
       const evento = inp.tagName === 'SELECT' || inp.type === 'checkbox' ? 'change' : 'input';
       inp.addEventListener(evento, () => {
+        // Cambiar de tela o de sistema cambia la lista de colores de al lado,
+        // así que el renglón se arma de nuevo en vez de sólo recalcular.
+        if (campo === 'tela' || campo === 'sistemaKey') {
+          item[campo] = inp.value;
+          pintarItems();
+          pintarTotales();
+          avisar();
+          return;
+        }
         if (inp.type === 'checkbox') item[campo] = inp.checked;
         // Los <input type="number"> del navegador siempre usan punto decimal,
         // nunca separador de miles: leerNumero (pensado para texto con formato
@@ -578,7 +641,7 @@ export function montarEditor(contenedor, doc, {
       if (descripcion) partes.unshift(`<span class="mini">${esc(descripcion)}</span>`);
     } else {
       partes.push(`${num(c.m2)} m²${c.aplicaMinimo ? ' <span class="mini">(mínimo)</span>' : ''}`);
-      partes.push(`sistema ${esc(c.sistemaNombre || '—')}`);
+      partes.push(`sistema ${esc(sistemaConColor(c) || '—')}`);
       if (soloTela) partes.push(soloTela);
       if (c.incrementoPct) partes.push(`+${num(c.incrementoPct, 0)}%`);
       sinPrecio = c.precioTela === 0 || c.precioSistema === 0;

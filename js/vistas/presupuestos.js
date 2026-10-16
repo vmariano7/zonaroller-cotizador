@@ -1,7 +1,7 @@
 // Listado y detalle de presupuestos.
 
 import { estado, guardar, borrar, obtener, proximoNumero } from '../store.js';
-import { calcularTotales, descripcionItem, detallesTecnicos, frasearUnidades, unidadesDeDocs, NOMBRE_TIPO } from '../calc.js';
+import { calcularTotales, descripcionItem, detallesTecnicos, frasearUnidades, unidadesDeDocs, NOMBRE_TIPO, telaConColor } from '../calc.js';
 import { plata, num, fecha, esc, aviso, confirmar, chip, vacio, ajuste, ESTADOS_PRESUPUESTO, sumarDias, medidaTexto } from '../ui.js';
 import { navegar } from '../router.js';
 import { imprimirPresupuesto } from '../pdf.js';
@@ -164,7 +164,7 @@ export function renderDetalle(contenedor, params) {
             ${t.lineas.map(({ item, calc }) => `
               <tr>
                 <td>${esc(item.ambiente || '—')}${item.detalle ? `<div class="mini">${esc(item.detalle)}</div>` : ''}</td>
-                <td>${esc(NOMBRE_TIPO[item.tipo] || item.tipo)}<div class="mini">${esc(descripcionItem(item) || item.tela)}</div></td>
+                <td>${esc(NOMBRE_TIPO[item.tipo] || item.tipo)}<div class="mini">${esc(descripcionItem(item) || telaConColor(item))}</div></td>
                 <td class="num">${medidaTexto(item, calc)}</td>
                 <td class="num">${num(calc.m2)}</td>
                 <td class="num">${calc.cantidad}</td>
@@ -216,7 +216,7 @@ export function renderDetalle(contenedor, params) {
     const tel = String(p.cliente.telefono).replace(/\D/g, '');
     const emp = estado.config.empresa || {};
     const lineas = t.lineas.map(({ item, calc }) => {
-      const nombre = item.producto || item.tela;
+      const nombre = item.producto || telaConColor(item);
       const detalle = detallesTecnicos(item).join(', ');
       return `• ${item.ambiente || 'Cortina'} — ${nombre}, ${medidaTexto(item, calc)}${detalle ? ` (${detalle})` : ''}${calc.cantidad > 1 ? ` (x${calc.cantidad})` : ''}: ${plata(calc.total)}`;
     });

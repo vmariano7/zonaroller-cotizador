@@ -3,7 +3,7 @@
 // En la compu: destino "Guardar como PDF".
 
 import { estado } from './store.js';
-import { calcularTotales, descripcionItem, detallesTecnicos, NOMBRE_TIPO, CATEGORIA } from './calc.js';
+import { calcularTotales, descripcionItem, detallesTecnicos, NOMBRE_TIPO, CATEGORIA, telaConColor, sistemaConColor } from './calc.js';
 import { plata, num, fecha, esc, sumarDias, ajuste, medidaTexto, capitalizar } from './ui.js';
 import { datosContado } from './mensaje.js';
 import { totalPedido, cobrado, saldo, venta } from './dinero.js';
@@ -105,7 +105,7 @@ export function imprimirPresupuesto(p) {
         ${t.lineas.map(({ item, calc }) => `
           <tr>
             <td>${esc(item.ambiente || '—')}</td>
-            <td>${esc(descripcionItem(item) || `${NOMBRE_TIPO[item.tipo] || item.tipo} · ${item.tela}`)}${calc.soloTela ? '<br><span style="font-size:8pt">Solo tela</span>' : ''}${calc.automatizada ? '<br><span style="font-size:8pt">Automatizada, con motor</span>' : ''}${item.detalle ? `<br><span style="font-size:8pt">${esc(item.detalle)}</span>` : ''}${item.instalacion ? '<br><span style="font-size:8pt">Instalación sin cargo</span>' : ''}</td>
+            <td>${esc(descripcionItem(item) || `${NOMBRE_TIPO[item.tipo] || item.tipo} · ${telaConColor(item)}`)}${calc.soloTela ? '<br><span style="font-size:8pt">Solo tela</span>' : ''}${calc.automatizada ? '<br><span style="font-size:8pt">Automatizada, con motor</span>' : ''}${item.detalle ? `<br><span style="font-size:8pt">${esc(item.detalle)}</span>` : ''}${item.instalacion ? '<br><span style="font-size:8pt">Instalación sin cargo</span>' : ''}</td>
             <td class="num">${medidaTexto(item, calc)}</td>
             <td class="num">${calc.cantidad}</td>
             <td class="num">${plata(calc.precioUnitario)}</td>
@@ -188,7 +188,7 @@ export function imprimirOrdenTrabajo(p) {
           const enMetros = item.tipo === 'tela_tradicional';
           const ancho = esAdicional ? '—' : enMetros ? `${num(item.anchoM)} m` : `${num(item.anchoCm, 0)} cm`;
           const alto = esAdicional ? '—' : enMetros ? `${num(item.altoM)} m` : `${num(item.altoCm, 0)} cm`;
-          const subtitulo = esAdicional ? item.producto : `${item.tela}${enMetros ? ` ${item.color || ''}` : ''}`;
+          const subtitulo = esAdicional ? item.producto : `${telaConColor(item)}${enMetros ? ` ${item.color || ''}` : ''}`;
           // El taller necesita todo el armado: comando, cadena, caída, caño.
           const detalle = [...detallesTecnicos(item), item.detalle].filter(Boolean).join(' · ');
           return `
@@ -198,7 +198,7 @@ export function imprimirOrdenTrabajo(p) {
             <td class="num"><strong>${ancho}</strong></td>
             <td class="num"><strong>${alto}</strong></td>
             <td class="num">${calc.cantidad}</td>
-            <td style="font-size:8.5pt">${calc.soloTela ? '<strong>Solo tela</strong> (sin sistema)' : esc(calc.sistemaNombre)}</td>
+            <td style="font-size:8.5pt">${calc.soloTela ? '<strong>Solo tela</strong> (sin sistema)' : esc(sistemaConColor(calc))}</td>
             <td style="font-size:8.5pt">${esc(detalle)}</td>
           </tr>`;
         }).join('')}

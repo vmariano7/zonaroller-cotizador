@@ -11,10 +11,34 @@
 // las mismas. Son sólo el punto de partida — la lista se edita en Ajustes.
 const TELAS_COMUNES = ['Blackout', 'Sunscreen 5%', 'Sunscreen 1%', 'South Beach', 'Shangtung', 'Córdoba', 'Blackout decorativo'];
 
+// Las telas de roller, cada una con sus colores. El precio va por m² y se
+// carga en Ajustes; el color no lo cambia, salvo en Sun Screen 5%, donde cada
+// color puede tener el suyo (ver precioTela). Esto es sólo el punto de
+// partida: la lista entera se edita en Ajustes.
+const TELAS_ROLLER = [
+  { nombre: 'Black Out Vinílico EEUU', colores: ['Blanco', 'Beige', 'Gris', 'Ivory', 'Negro'] },
+  { nombre: 'Black Out Vinílico ECO', colores: ['Blanco', 'Beige', 'Gris', 'Ivory'] },
+  { nombre: 'Blackout Córdoba', colores: ['Nieve', 'Marfil', 'Centeno', 'Camel', 'Tostado', 'Grafito', 'Plomo'] },
+  { nombre: 'Sun Screen 1%', colores: ['Blanco-Blanco', 'Blanco-Beige', 'Blanco-Gris', 'Negro-Negro'] },
+  // El primero de la lista es el que sale por defecto al cotizar, así que va
+  // uno de los más baratos: los demás suben el precio (ver precioTela).
+  { nombre: 'Sun Screen 5%', colores: [
+    'Blanco-Blanco', 'Blanco-Beige', 'Blanco-Gris',
+    'Beige-Beige', 'Gris-Gris', 'Negro-Negro', 'Chocolate-Chocolate',
+    'Amarillo-Blanco', 'Verde-Blanco', 'Rojo-Blanco', 'Azul-Blanco',
+  ] },
+  { nombre: 'Sun Screen 5% Bicolor', colores: ['Bronce', 'Ceniza', 'Caliza', 'Cromo', 'Hierro', 'Cobre', 'Níquel', 'Carbón'] },
+  { nombre: 'Sun Screen 5% ECO', colores: ['Blanco-Blanco', 'Blanco-Beige.02', 'Blanco-Gris.03', 'Beige-Beige'] },
+  { nombre: 'South Beach', colores: ['Safari', 'Blanco', 'Latte', 'Arena', 'Cielo', 'Natural'] },
+  { nombre: 'Córdoba', colores: ['Nieve', 'Marfil', 'Centeno', 'Camel', 'Tostado', 'Grafito', 'Plomo'] },
+  { nombre: 'Shantung', colores: ['Pistacho', 'Gris Claro', 'Tierra', 'Gris Oscuro'] },
+  { nombre: 'Lux', colores: ['Blanco', 'Ivory', 'Beige', 'Chocolate', 'Esmeralda', 'Perla', 'Terracota', 'Rojo', 'Gris Cemento', 'Tostado'] },
+];
+
 export const TIPOS = {
   roller: {
     nombre: 'Roller',
-    telas: [...TELAS_COMUNES],
+    telas: TELAS_ROLLER.map((t) => ({ ...t, colores: [...t.colores] })),
   },
   vertical: {
     nombre: 'Bandas verticales',
@@ -38,12 +62,19 @@ export const TIPOS = {
   },
 };
 
+// Cada sistema dice a qué tipo de cortina pertenece y de qué colores viene.
+// El costo (por metro lineal) se carga en Ajustes y no depende del color.
 export const SISTEMAS = {
-  roller_basico: 'Roller · Blackout / Sunscreen 5%',
-  roller_demas: 'Roller · Demás telas',
-  vertical_basico: 'Vertical · Blackout / Sunscreen 5%',
-  vertical_demas: 'Vertical · Demás telas',
-  zebra: 'Sistema Zebra',
+  roller_mini_18: { nombre: 'MINI 18mm', tipo: 'roller', colores: ['Blanco', 'Negro'] },
+  roller_zenith_32: { nombre: 'ZENITH 32mm', tipo: 'roller', colores: ['Blanco', 'Gris', 'Negro'] },
+  roller_zenith_38: { nombre: 'ZENITH 38mm', tipo: 'roller', colores: ['Blanco', 'Gris', 'Negro'] },
+  roller_zenith_50: { nombre: 'ZENITH 50mm', tipo: 'roller', colores: ['Blanco', 'Negro'] },
+  roller_quantum_28: { nombre: 'QUANTUM 28mm', tipo: 'roller', colores: ['Blanco', 'Gris', 'Negro'] },
+  roller_quantum_38: { nombre: 'QUANTUM 38mm', tipo: 'roller', colores: ['Blanco', 'Gris', 'Negro'] },
+  roller_quantum_45: { nombre: 'QUANTUM 45mm', tipo: 'roller', colores: ['Blanco', 'Negro'] },
+  vertical_basico: { nombre: 'Vertical · Blackout / Sunscreen 5%', tipo: 'vertical', colores: [] },
+  vertical_demas: { nombre: 'Vertical · Demás telas', tipo: 'vertical', colores: [] },
+  zebra: { nombre: 'Sistema Zebra', tipo: 'zebra', colores: [] },
   // Los paneles orientales se pueden hacer con tres sistemas distintos, uno
   // por cantidad de canales del riel. Cuál va en cada cortina se elige a mano
   // al cotizar (ver sistemasElegibles) y el costo de cada uno se carga en
@@ -51,10 +82,49 @@ export const SISTEMAS = {
   // cotizador, no sistemas sueltos.
   // Ojo con la clave del primero: es la que ya venía, así que un renglón
   // cotizado antes de que fueran tres sigue valiendo lo mismo.
-  panel_oriental: 'Paneles orientales · 3 canales',
-  panel_oriental_2: 'Paneles orientales · 4 canales',
-  panel_oriental_3: 'Paneles orientales · 5 canales',
+  panel_oriental: { nombre: 'Paneles orientales · 3 canales', tipo: 'panel_oriental', colores: [] },
+  panel_oriental_2: { nombre: 'Paneles orientales · 4 canales', tipo: 'panel_oriental', colores: [] },
+  panel_oriental_3: { nombre: 'Paneles orientales · 5 canales', tipo: 'panel_oriental', colores: [] },
 };
+
+/** Los tipos de cortina en los que el sistema se elige a mano al cotizar. */
+const ELIGE_SISTEMA = ['roller', 'panel_oriental'];
+
+/** El que viene puesto en una cortina nueva. El resto arranca sin elegir. */
+export const SISTEMA_POR_DEFECTO = { roller: 'roller_zenith_32' };
+
+/** ¿En este tipo de cortina el sistema se elige a mano? */
+export function eligeSistema(tipo) {
+  return ELIGE_SISTEMA.includes(tipo);
+}
+
+/**
+ * De qué tipo es un sistema guardado que no lo dice (configs de antes de que
+ * los sistemas supieran a qué cortina pertenecen). Se deduce de la clave.
+ */
+function tipoDeSistemaPorId(id) {
+  const clave = String(id || '');
+  if (clave.startsWith('panel_oriental')) return 'panel_oriental';
+  if (clave.startsWith('roller')) return 'roller';
+  if (clave.startsWith('vertical')) return 'vertical';
+  if (clave === 'zebra') return 'zebra';
+  return '';
+}
+
+/** Un sistema del catálogo, con todos sus campos, venga como venga. */
+export function sistemaNormalizado(s) {
+  const id = String(s?.id || '');
+  return {
+    id,
+    nombre: String(s?.nombre || ''),
+    tipo: s?.tipo || tipoDeSistemaPorId(id),
+    colores: Array.isArray(s?.colores) ? [...s.colores] : [],
+    protegido: !!s?.protegido,
+    // Los que quedaron de versiones anteriores: siguen valiendo para lo ya
+    // cotizado, pero no se ofrecen al armar una cortina nueva.
+    oculto: !!s?.oculto,
+  };
+}
 
 /**
  * Los tres sistemas de paneles orientales. Son los únicos cuyo nombre no se
@@ -71,14 +141,28 @@ export function esSistemaFijo(id) {
 }
 
 /**
- * Los sistemas entre los que se elige a mano al cotizar. Sólo los paneles
- * orientales: en los demás tipos el sistema lo decide el tipo y la tela
- * (ver sistemaAuto), así que no hay nada que elegir.
+ * Los sistemas entre los que se elige a mano al cotizar: los de ese tipo de
+ * cortina que no estén ocultos. En los tipos que no eligen (verticales, zebra)
+ * el sistema lo decide la tela, ver sistemaAuto.
  */
 export function sistemasElegibles(tipo, config) {
-  if (tipo !== 'panel_oriental') return [];
-  const catalogo = sistemasDeConfig(config);
-  return SISTEMAS_PANEL.map((id) => catalogo.find((s) => s.id === id)).filter(Boolean);
+  if (!eligeSistema(tipo)) return [];
+  return sistemasDeConfig(config).filter((s) => s.tipo === tipo && !s.oculto);
+}
+
+/** La tela de un renglón con su color, tal como se muestra y se imprime. */
+export function telaConColor(item) {
+  return [item?.tela, item?.telaColor].filter(Boolean).join(' · ');
+}
+
+/** El sistema de un renglón con su color. */
+export function sistemaConColor(calc) {
+  return [calc?.sistemaNombre, calc?.sistemaColor].filter(Boolean).join(' · ');
+}
+
+/** Los colores en que viene un sistema. */
+export function coloresDeSistema(id, config) {
+  return sistemasDeConfig(config).find((s) => s.id === id)?.colores || [];
 }
 
 /**
@@ -90,12 +174,12 @@ export function sistemasElegibles(tipo, config) {
 export function sistemasDeConfig(config) {
   // Los tres de paneles orientales van con el nombre del código aunque el
   // catálogo guardado tenga otro: ver SISTEMAS_PANEL.
-  const guardados = (config?.catalogoSistemas || []).map((s) => (
-    esSistemaFijo(s.id) ? { ...s, nombre: SISTEMAS[s.id], protegido: true } : s
+  const guardados = (config?.catalogoSistemas || []).map((s) => sistemaNormalizado(
+    esSistemaFijo(s.id) ? { ...s, ...SISTEMAS[s.id], id: s.id, protegido: true } : s
   ));
   const faltantes = Object.entries(SISTEMAS)
     .filter(([id]) => !guardados.some((s) => s.id === id))
-    .map(([id, nombre]) => ({ id, nombre, protegido: true }));
+    .map(([id, def]) => sistemaNormalizado({ id, ...def, protegido: true }));
   return [...guardados, ...faltantes];
 }
 
@@ -114,9 +198,9 @@ export const NOMBRE_TIPO = {
  * `SISTEMAS` queda como default para configs viejas que todavía no lo tienen.
  */
 export function nombreSistema(id, config) {
-  if (esSistemaFijo(id)) return SISTEMAS[id];
+  if (esSistemaFijo(id)) return SISTEMAS[id].nombre;
   const enCatalogo = (config?.catalogoSistemas || []).find((s) => s.id === id);
-  return enCatalogo?.nombre || SISTEMAS[id] || id;
+  return enCatalogo?.nombre || SISTEMAS[id]?.nombre || id;
 }
 
 /**
@@ -126,7 +210,47 @@ export function nombreSistema(id, config) {
  */
 export function telasDeTipo(tipo, config) {
   const cat = config?.catalogoTelas?.[tipo];
-  return Array.isArray(cat) && cat.length ? cat : (TIPOS[tipo]?.telas || []);
+  const lista = Array.isArray(cat) && cat.length ? cat : (TIPOS[tipo]?.telas || []);
+  return lista.map(telaNormalizada).filter((t) => t.nombre);
+}
+
+/**
+ * Una entrada del catálogo de telas. Puede estar guardada como el nombre
+ * suelto (así era antes de que las telas tuvieran colores) o como objeto.
+ */
+export function telaNormalizada(entrada) {
+  if (typeof entrada === 'string') return { nombre: entrada, colores: [] };
+  return {
+    nombre: String(entrada?.nombre || ''),
+    colores: Array.isArray(entrada?.colores) ? [...entrada.colores] : [],
+  };
+}
+
+/** Los colores en que viene una tela. */
+export function coloresDeTela(tipo, nombre, config) {
+  return telasDeTipo(tipo, config).find((t) => t.nombre === nombre)?.colores || [];
+}
+
+/**
+ * Precio por m² de una tela. Casi siempre es un número y el color no lo
+ * cambia. Cuando sí lo cambia (hoy, Sun Screen 5%), lo guardado es un objeto
+ * con un precio por color y `*` como precio de los colores que no estén
+ * listados.
+ */
+export function precioTela(tipo, tela, color, config) {
+  const valor = config?.telas?.[tipo]?.[tela];
+  if (valor && typeof valor === 'object') {
+    const delColor = valor[color];
+    return Number(delColor === undefined || delColor === '' ? valor['*'] : delColor) || 0;
+  }
+  return Number(valor) || 0;
+}
+
+/** El precio general de una tela: el que vale salvo que el color diga otra cosa. */
+export function precioBaseTela(tipo, tela, config) {
+  const valor = config?.telas?.[tipo]?.[tela];
+  if (valor && typeof valor === 'object') return Number(valor['*']) || 0;
+  return Number(valor) || 0;
 }
 
 /**
@@ -170,13 +294,13 @@ export function configVacia() {
     // (renombrar) y borrar desde Ajustes. Arranca con las de siempre para que
     // no cambie nada hasta que lo toques.
     catalogoTelas: {
-      roller: [...TIPOS.roller.telas],
+      roller: TIPOS.roller.telas.map((t) => ({ ...t, colores: [...t.colores] })),
       vertical: [...TIPOS.vertical.telas],
       panel_oriental: [...TIPOS.panel_oriental.telas],
       zebra: [...TIPOS.zebra.telas],
     },
     telas: {
-      roller: cero(TIPOS.roller.telas),
+      roller: cero(TIPOS.roller.telas.map((t) => t.nombre)),
       vertical: cero(TIPOS.vertical.telas),
       panel_oriental: cero(TIPOS.panel_oriental.telas),
       zebra: cero(TIPOS.zebra.telas),
@@ -184,11 +308,8 @@ export function configVacia() {
     // Catálogo de sistemas: igual que las telas, editable desde Ajustes.
     // `protegido` son los que arma el cálculo automático (ver sistemaAuto);
     // se pueden renombrar o borrar igual, pero Ajustes avisa antes de borrarlos.
-    catalogoSistemas: Object.entries(SISTEMAS).map(([id, nombre]) => ({ id, nombre, protegido: true })),
-    sistemas: {
-      roller_basico: 0, roller_demas: 0, vertical_basico: 0, vertical_demas: 0, zebra: 0,
-      panel_oriental: 0, panel_oriental_2: 0, panel_oriental_3: 0,
-    },
+    catalogoSistemas: Object.entries(SISTEMAS).map(([id, def]) => sistemaNormalizado({ id, ...def, protegido: true })),
+    sistemas: Object.fromEntries(Object.keys(SISTEMAS).map((id) => [id, 0])),
     // Telas que usan el sistema "básico" (más económico) en roller y vertical.
     telasSistemaBasico: ['Blackout', 'Sunscreen 5%'],
     // Adicionales: catálogo de productos simples (nombre + precio por unidad)
@@ -278,15 +399,20 @@ export function itemVacio(tipo = 'roller') {
       detalle: '',
     };
   }
+  const primeraTela = telaNormalizada(TIPOS[tipo].telas[0]);
   return {
     id: crypto.randomUUID(),
     ambiente: '',
     tipo,
-    tela: TIPOS[tipo].telas[0],
+    tela: primeraTela.nombre,
+    telaColor: primeraTela.colores[0] || '',
     anchoCm: null,
     altoCm: null,
     cantidad: 1,
-    sistemaKey: null, // null = automático según tipo y tela
+    // Los tipos que eligen sistema a mano arrancan con uno puesto; en los
+    // demás queda en null y lo decide la tela (ver sistemaAuto).
+    sistemaKey: SISTEMA_POR_DEFECTO[tipo] || null,
+    sistemaColor: '',
     instalacion: true,
     soloTela: false, // el cliente pone el sistema: se vende la tela sola, con descuento fijo
     ...(admiteMotor(tipo) ? { automatizada: false } : {}),
@@ -553,11 +679,11 @@ export function calcularItem(item, config, contexto = {}) {
   const m2 = Math.max(Number(config.minimoM2) || 0, anchoCobrado * altoCobrado);
   const aplicaMinimo = m2 > m2Real + 1e-9;
 
-  const precioTela = Number(config.telas?.[item.tipo]?.[item.tela]) || 0;
+  const precioTelaUnit = precioTela(item.tipo, item.tela, item.telaColor, config);
   const sistemaKey = item.sistemaKey || sistemaAuto(item.tipo, item.tela, config);
   const precioSistema = Number(config.sistemas?.[sistemaKey]) || 0;
 
-  const costoTela = m2 * precioTela;
+  const costoTela = m2 * precioTelaUnit;
   const costoSistema = anchoCobrado * precioSistema;
   const base = costoTela + costoSistema;
 
@@ -602,11 +728,13 @@ export function calcularItem(item, config, contexto = {}) {
     anchoM,
     altoM,
     cantidad,
-    precioTela,
+    precioTela: precioTelaUnit,
     soloTela,
     descuentoSoloTela: descSoloTela,
     sistemaKey,
     sistemaNombre: nombreSistema(sistemaKey, config),
+    sistemaColor: item.sistemaColor || '',
+    telaColor: item.telaColor || '',
     precioSistema,
     costoTela,
     costoSistema,
@@ -795,7 +923,9 @@ export function calcularTotales(items, config, opciones = {}) {
 }
 
 export function hayPreciosCargados(config) {
-  const telas = Object.values(config.telas || {}).flatMap((g) => Object.values(g || {}));
+  const telas = Object.values(config.telas || {})
+    .flatMap((g) => Object.values(g || {}))
+    .flatMap((v) => (v && typeof v === 'object' ? Object.values(v) : [v]));
   const sistemas = Object.values(config.sistemas || {});
   return [...telas, ...sistemas].some((v) => Number(v) > 0);
 }

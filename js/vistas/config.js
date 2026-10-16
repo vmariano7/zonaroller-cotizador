@@ -2,7 +2,7 @@
 // sincronización con la nube y respaldos.
 
 import { estado, guardarConfig, cerrarSesion, sincronizar, exportarRespaldo, importarRespaldo } from '../store.js';
-import { TIPOS, CATEGORIA, sistemasDeConfig, usaSistemaBasico, esSistemaFijo } from '../calc.js';
+import { TIPOS, CATEGORIA, sistemasDeConfig, usaSistemaBasico, esSistemaFijo, telasDeTipo, precioBaseTela, eligeSistema } from '../calc.js';
 import { esc, aviso, confirmar, descargarArchivo, fecha, plata, modal } from '../ui.js';
 import { plantillaDe, CLAVES } from '../mensaje.js';
 import { tienePin, definirPin } from '../candado.js';
@@ -44,13 +44,31 @@ export function render(contenedor) {
               <span style="flex:1">${esc(def.nombre)}</span>
               <button class="btn btn--chico btn--fantasma" data-gestionar-telas="${tipo}" style="font-size:.7rem;padding:.3rem .6rem">Agregar / borrar</button>
             </h3>
-            ${(c.catalogoTelas?.[tipo] || def.telas).map((tela) => `
+            ${telasDeTipo(tipo, c).map(({ nombre, colores }) => {
+              const guardado = c.telas?.[tipo]?.[nombre];
+              const porColor = guardado && typeof guardado === 'object' ? guardado : null;
+              const distintos = porColor ? Object.keys(porColor).filter((k) => k !== '*').length : 0;
+              return `
               <div class="campo" style="display:flex;align-items:center;gap:.6rem">
-                <label style="flex:1;margin:0;font-weight:500;color:var(--acento)">${esc(tela)}</label>
+                <label style="flex:1;margin:0;font-weight:500;color:var(--acento)">${esc(nombre)}</label>
                 <div class="con-prefijo" style="width:130px"><span>$</span>
-                  <input type="number" inputmode="decimal" min="0" step="1" data-tela="${tipo}|${esc(tela)}" value="${c.telas?.[tipo]?.[tela] ?? 0}">
+                  <input type="number" inputmode="decimal" min="0" step="1" data-tela="${tipo}|${esc(nombre)}" value="${precioBaseTela(tipo, nombre, c)}">
                 </div>
-              </div>`).join('')}
+              </div>
+              ${colores.length ? `
+              <details class="avanzadas" style="margin:-.2rem 0 .7rem">
+                <summary class="mini">Colores y precios ${distintos ? `· ${distintos} con precio propio` : `· ${colores.length}, todos al mismo precio`}</summary>
+                <div class="mini" style="margin:.5rem 0">Dejá vacío el color que valga lo mismo que arriba.</div>
+                ${colores.map((color) => `
+                  <div class="campo" style="display:flex;align-items:center;gap:.6rem">
+                    <label style="flex:1;margin:0">${esc(color)}</label>
+                    <div class="con-prefijo" style="width:130px"><span>$</span>
+                      <input type="number" inputmode="decimal" min="0" step="1" placeholder="${precioBaseTela(tipo, nombre, c)}"
+                             data-tela-color="${tipo}|${esc(nombre)}|${esc(color)}" value="${porColor?.[color] ?? ''}">
+                    </div>
+                  </div>`).join('')}
+              </details>` : ''}`;
+            }).join('')}
           </div>`).join('')}
       </div>
       <div class="banner banner--info" style="margin-top:1rem">
@@ -329,7 +347,10 @@ export function render(contenedor) {
       <div class="fila-botones">
         <button class="btn" data-exportar>Descargar respaldo</button>
         <label class="btn" style="margin:0">Importar archivo<input type="file" accept="application/json,.json" data-importar hidden></label>
+        <label class="btn" style="margin:0">Importar lista de precios<input type="file" accept="application/json,.json" data-importar-precios hidden></label>
       </div>
+      <div class="mini mt-16"><strong>Importar lista de precios</strong> sólo toca telas y sistemas: los
+      carga y actualiza sin tocar nada más de la configuración, y sin borrar los que ya tenías.</div>
       <div class="mini mt-16">${estado.presupuestos.length} presupuestos · ${estado.pedidos.length} pedidos · ${estado.agenda.length} eventos · ${estado.movimientos.length} movimientos</div>
     </div>
   `;
@@ -340,12 +361,34 @@ export function render(contenedor) {
   const leerCasillero = (inp) => Number(inp.value) || 0;
 
   /* ---- Precios de telas ---- */
+  // El precio de una tela es un número suelto, salvo cuando algún color vale
+  // distinto: ahí se guarda un objeto con un precio por color y `*` como
+  // precio general. Ver precioTela en calc.js.
+  const guardarPrecioTela = (tipo, tela, armar) => {
+    const telas = { ...estado.config.telas };
+    telas[tipo] = { ...telas[tipo], [tela]: armar(telas[tipo]?.[tela]) };
+    guardarPronto({ telas });
+  };
+
   contenedor.querySelectorAll('[data-tela]').forEach((inp) =>
     inp.addEventListener('input', () => {
       const [tipo, tela] = inp.dataset.tela.split('|');
-      const telas = { ...estado.config.telas };
-      telas[tipo] = { ...telas[tipo], [tela]: leerCasillero(inp) };
-      guardarPronto({ telas });
+      guardarPrecioTela(tipo, tela, (actual) => (actual && typeof actual === 'object'
+        ? { ...actual, '*': leerCasillero(inp) }
+        : leerCasillero(inp)));
+    })
+  );
+
+  contenedor.querySelectorAll('[data-tela-color]').forEach((inp) =>
+    inp.addEventListener('input', () => {
+      const [tipo, tela, color] = inp.dataset.telaColor.split('|');
+      guardarPrecioTela(tipo, tela, (actual) => {
+        const mapa = actual && typeof actual === 'object' ? { ...actual } : { '*': Number(actual) || 0 };
+        if (inp.value === '') delete mapa[color];
+        else mapa[color] = leerCasillero(inp);
+        // Si ningún color quedó con precio propio, vuelve a ser un número.
+        return Object.keys(mapa).some((k) => k !== '*') ? mapa : (mapa['*'] || 0);
+      });
     })
   );
 
@@ -508,6 +551,20 @@ export function render(contenedor) {
     aviso('Respaldo descargado.');
   });
 
+  contenedor.querySelector('[data-importar-precios]').addEventListener('change', async (e) => {
+    const archivo = e.target.files?.[0];
+    if (!archivo) return;
+    try {
+      const datos = JSON.parse(await archivo.text());
+      const cuenta = await importarListaDePrecios(datos);
+      aviso(`Lista cargada: ${cuenta.telas} telas y ${cuenta.sistemas} sistemas.`);
+      render(contenedor);
+    } catch (err) {
+      aviso(`No pude leer el archivo. ${err.message}`, 'error');
+    }
+    e.target.value = '';
+  });
+
   contenedor.querySelector('[data-importar]').addEventListener('change', async (e) => {
     const archivo = e.target.files?.[0];
     if (!archivo) return;
@@ -529,6 +586,43 @@ export function render(contenedor) {
 }
 
 /**
+ * Carga una lista de precios: telas y sistemas con sus colores y sus valores.
+ * Se mezcla con lo que ya está cargado —lo que no viene en el archivo queda
+ * como está, así los presupuestos viejos siguen encontrando sus telas y sus
+ * sistemas— y no toca ninguna otra parte de la configuración.
+ */
+async function importarListaDePrecios(datos) {
+  const c = estado.config;
+  const cambios = {};
+  const cuenta = { telas: 0, sistemas: 0 };
+
+  if (datos.catalogoTelas) {
+    cambios.catalogoTelas = { ...c.catalogoTelas, ...datos.catalogoTelas };
+  }
+  if (datos.telas) {
+    const telas = { ...c.telas };
+    Object.entries(datos.telas).forEach(([tipo, mapa]) => {
+      telas[tipo] = { ...telas[tipo], ...mapa };
+      cuenta.telas += Object.keys(mapa).length;
+    });
+    cambios.telas = telas;
+  }
+  if (Array.isArray(datos.catalogoSistemas)) {
+    const porId = new Map((c.catalogoSistemas || []).map((s) => [s.id, s]));
+    datos.catalogoSistemas.forEach((s) => porId.set(s.id, { ...porId.get(s.id), ...s }));
+    cambios.catalogoSistemas = [...porId.values()];
+  }
+  if (datos.sistemas) {
+    cambios.sistemas = { ...c.sistemas, ...datos.sistemas };
+    cuenta.sistemas = Object.keys(datos.sistemas).length;
+  }
+  if (!Object.keys(cambios).length) throw new Error('El archivo no trae telas ni sistemas.');
+
+  await guardarConfig(cambios);
+  return cuenta;
+}
+
+/**
  * Agregar, renombrar o borrar telas de un tipo (roller, vertical o zebra).
  * Roller y vertical llevan además el tilde de "sistema básico": las telas
  * tildadas usan el sistema económico (ver `telasSistemaBasico` en calc.js);
@@ -537,18 +631,27 @@ export function render(contenedor) {
  */
 function dialogoTelas(tipo, alGuardar) {
   const nombreTipo = TIPOS[tipo].nombre;
-  const nombresOriginales = estado.config.catalogoTelas?.[tipo] || TIPOS[tipo].telas;
+  const originales = telasDeTipo(tipo, estado.config);
+  const nombresOriginales = originales.map((t) => t.nombre);
   const precios = estado.config.telas?.[tipo] || {};
   const basicas = new Set(estado.config.telasSistemaBasico || []);
-  // Sólo roller y verticales eligen sistema según la tela; zebra y paneles
-  // orientales tienen uno solo, así que ahí el tilde no tendría sentido.
-  const conSistema = usaSistemaBasico(tipo);
+  // El tilde de "sistema básico" sólo tiene sentido donde el sistema lo decide
+  // la tela: en los tipos que lo eligen a mano al cotizar, no.
+  const conSistema = usaSistemaBasico(tipo) && !eligeSistema(tipo);
 
-  let lista = nombresOriginales.map((n) => ({ nombre: n, precio: Number(precios[n]) || 0, basico: basicas.has(n) }));
-  if (!lista.length) lista.push({ nombre: '', precio: 0, basico: false });
+  let lista = originales.map((t) => ({
+    nombre: t.nombre,
+    colores: t.colores.join(', '),
+    precio: precioBaseTela(tipo, t.nombre, estado.config),
+    basico: basicas.has(t.nombre),
+  }));
+  const filaVacia = () => ({ nombre: '', colores: '', precio: 0, basico: false });
+  if (!lista.length) lista.push(filaVacia());
 
   const m = modal(`Telas de ${nombreTipo}`, `
-    <div class="mini mb-16">Agregá, renombrá o borrá telas de ${nombreTipo.toLowerCase()}.
+    <div class="mini mb-16">Agregá, renombrá o borrá telas de ${nombreTipo.toLowerCase()}. Los colores van
+    separados por coma y se eligen al cotizar; si alguno vale distinto, su precio se carga en Ajustes,
+    debajo de la tela.
     ${conSistema ? ' Tildá <strong>sistema básico</strong> para las que usan el sistema más económico (por defecto Blackout y Sunscreen 5%); el resto usa "demás telas".' : ''}</div>
     <div data-filas></div>
     <button class="btn btn--chico mt-16" data-agregar style="width:100%">+ Agregar tela</button>
@@ -561,18 +664,25 @@ function dialogoTelas(tipo, alGuardar) {
 
   function pintarFilas() {
     cajaFilas.innerHTML = lista.map((t, i) => `
-      <div class="campo" style="display:flex;align-items:center;gap:.5rem;margin-bottom:.5rem">
-        <input data-nombre="${i}" placeholder="Ej. Sunscreen 3%" value="${esc(t.nombre)}" style="flex:1">
-        <div class="con-prefijo" style="width:130px"><span>$</span>
-          <input type="number" inputmode="decimal" min="0" step="1" data-precio="${i}" value="${t.precio}">
+      <div class="campo" style="margin-bottom:.7rem">
+        <div style="display:flex;align-items:center;gap:.5rem">
+          <input data-nombre="${i}" placeholder="Ej. Sunscreen 3%" value="${esc(t.nombre)}" style="flex:1">
+          <div class="con-prefijo" style="width:130px"><span>$</span>
+            <input type="number" inputmode="decimal" min="0" step="1" data-precio="${i}" value="${t.precio}">
+          </div>
+          ${conSistema ? `
+          <label class="switch" style="margin:0" title="Usa el sistema básico">
+            <input type="checkbox" data-basico="${i}"${t.basico ? ' checked' : ''}>
+            <span class="switch__pista"></span>
+          </label>` : ''}
+          <button class="btn-icono" data-quitar="${i}" title="Quitar">&#10005;</button>
         </div>
-        ${conSistema ? `
-        <label class="switch" style="margin:0" title="Usa el sistema básico">
-          <input type="checkbox" data-basico="${i}"${t.basico ? ' checked' : ''}>
-          <span class="switch__pista"></span>
-        </label>` : ''}
-        <button class="btn-icono" data-quitar="${i}" title="Quitar">&#10005;</button>
+        <input data-colores="${i}" placeholder="Colores, separados por coma" value="${esc(t.colores)}" style="margin-top:.35rem">
       </div>`).join('');
+
+    cajaFilas.querySelectorAll('[data-colores]').forEach((inp) =>
+      inp.addEventListener('input', () => { lista[Number(inp.dataset.colores)].colores = inp.value; })
+    );
 
     cajaFilas.querySelectorAll('[data-nombre]').forEach((inp) =>
       inp.addEventListener('input', () => { lista[Number(inp.dataset.nombre)].nombre = inp.value; })
@@ -586,7 +696,7 @@ function dialogoTelas(tipo, alGuardar) {
     cajaFilas.querySelectorAll('[data-quitar]').forEach((b) =>
       b.addEventListener('click', () => {
         lista.splice(Number(b.dataset.quitar), 1);
-        if (!lista.length) lista.push({ nombre: '', precio: 0, basico: false });
+        if (!lista.length) lista.push(filaVacia());
         pintarFilas();
       })
     );
@@ -594,7 +704,7 @@ function dialogoTelas(tipo, alGuardar) {
   pintarFilas();
 
   m.cuerpo.querySelector('[data-agregar]').addEventListener('click', () => {
-    lista.push({ nombre: '', precio: 0, basico: false });
+    lista.push(filaVacia());
     pintarFilas();
   });
 
@@ -606,10 +716,22 @@ function dialogoTelas(tipo, alGuardar) {
     }
     const nombresNuevos = [...new Set(limpia.map((t) => t.nombre))];
     const preciosNuevos = { ...precios };
-    nombresNuevos.forEach((n) => { preciosNuevos[n] = limpia.find((t) => t.nombre === n).precio; });
+    nombresNuevos.forEach((n) => {
+      const fila = limpia.find((t) => t.nombre === n);
+      const actual = preciosNuevos[n];
+      // Si la tela tenía precios por color, se le cambia sólo el general.
+      preciosNuevos[n] = actual && typeof actual === 'object' ? { ...actual, '*': fila.precio } : fila.precio;
+    });
+    // La tela se guarda como nombre suelto mientras no tenga colores; así los
+    // tipos que no los usan quedan igual que siempre.
+    const catalogoNuevo = nombresNuevos.map((n) => {
+      const colores = limpia.find((t) => t.nombre === n).colores
+        .split(',').map((x) => x.trim()).filter(Boolean);
+      return colores.length ? { nombre: n, colores } : n;
+    });
 
     const cambios = {
-      catalogoTelas: { ...estado.config.catalogoTelas, [tipo]: nombresNuevos },
+      catalogoTelas: { ...estado.config.catalogoTelas, [tipo]: catalogoNuevo },
       telas: { ...estado.config.telas, [tipo]: preciosNuevos },
     };
     if (conSistema) {
@@ -645,12 +767,14 @@ function dialogoSistemas(alGuardar) {
   // los sistemas que el cálculo conoce pero el config todavía no tiene (los de
   // paneles orientales, sin ir más lejos) aparecen acá, y guardar no les borra
   // el costo por no haber estado en la lista.
-  let lista = sistemasDeConfig(estado.config).map((s) => ({ ...s, precio: Number(estado.config.sistemas?.[s.id]) || 0 }));
+  let lista = sistemasDeConfig(estado.config).map((s) => ({ ...s, colores: s.colores.join(', '), precio: Number(estado.config.sistemas?.[s.id]) || 0 }));
 
   const m = modal('Sistemas', `
-    <div class="mini mb-16">Agregá, renombrá o borrá sistemas. Los marcados con ★ los pone el cotizador:
-    o los elige solo el cálculo según la tela, o son las tres opciones de paneles orientales, que ya
-    vienen con el nombre puesto y sólo necesitan que les cargues el costo.</div>
+    <div class="mini mb-16">Agregá, renombrá o borrá sistemas. Cada uno va atado a un tipo de cortina:
+    si ese tipo elige sistema a mano (roller, paneles orientales), aparece en el selector al cotizar.
+    Los colores van separados por coma. Los marcados con ★ los pone el cotizador: o los elige solo el
+    cálculo según la tela, o son las tres opciones de paneles orientales, que ya vienen con el nombre
+    puesto y sólo necesitan que les cargues el costo.</div>
     <div data-filas></div>
     <button class="btn btn--chico mt-16" data-agregar style="width:100%">+ Agregar sistema</button>
     <div class="fila-botones fila-botones--fin mt-16">
@@ -662,16 +786,33 @@ function dialogoSistemas(alGuardar) {
 
   function pintarFilas() {
     cajaFilas.innerHTML = lista.map((s, i) => `
-      <div class="campo" style="display:flex;align-items:center;gap:.5rem;margin-bottom:.5rem">
-        <input data-nombre="${i}" placeholder="Nombre del sistema" value="${esc(s.nombre)}" style="flex:1"${esSistemaFijo(s.id) ? ' readonly title="Es una de las tres opciones de paneles orientales: el nombre lo pone el cotizador"' : ''}>
-        ${s.protegido ? `<span class="mini" title="${esSistemaFijo(s.id) ? 'Opción fija del selector de paneles orientales' : 'Lo asigna solo el cálculo'}">★</span>` : ''}
-        <div class="con-prefijo" style="width:140px"><span>$</span>
-          <input type="number" inputmode="decimal" min="0" step="1" data-precio="${i}" value="${s.precio}">
+      <div class="campo" style="margin-bottom:.7rem${s.oculto ? ';opacity:.6' : ''}">
+        <div style="display:flex;align-items:center;gap:.5rem">
+          <input data-nombre="${i}" placeholder="Nombre del sistema" value="${esc(s.nombre)}" style="flex:1"${esSistemaFijo(s.id) ? ' readonly title="Es una de las tres opciones de paneles orientales: el nombre lo pone el cotizador"' : ''}>
+          ${s.protegido ? `<span class="mini" title="${esSistemaFijo(s.id) ? 'Opción fija del selector de paneles orientales' : 'Lo asigna solo el cálculo'}">★</span>` : ''}
+          <div class="con-prefijo" style="width:140px"><span>$</span>
+            <input type="number" inputmode="decimal" min="0" step="1" data-precio="${i}" value="${s.precio}">
+          </div>
+          ${esSistemaFijo(s.id)
+            ? '<span class="btn-icono" style="visibility:hidden"></span>'
+            : `<button class="btn-icono" data-quitar="${i}" title="Quitar">&#10005;</button>`}
         </div>
-        ${esSistemaFijo(s.id)
-          ? '<span class="btn-icono" style="visibility:hidden"></span>'
-          : `<button class="btn-icono" data-quitar="${i}" title="Quitar">&#10005;</button>`}
+        <div style="display:flex;align-items:center;gap:.5rem;margin-top:.35rem">
+          <select data-tipo-sistema="${i}" style="width:190px"${esSistemaFijo(s.id) ? ' disabled' : ''}>
+            <option value="">Sin tipo de cortina</option>
+            ${Object.entries(TIPOS).map(([clave, def]) => `<option value="${clave}"${s.tipo === clave ? ' selected' : ''}>${esc(def.nombre)}</option>`).join('')}
+          </select>
+          <input data-colores="${i}" placeholder="Colores, separados por coma" value="${esc(s.colores)}" style="flex:1">
+        </div>
+        ${s.oculto ? '<div class="mini" style="margin-top:.3rem">De una versión anterior: vale para lo ya cotizado, pero no se ofrece al armar una cortina nueva.</div>' : ''}
       </div>`).join('');
+
+    cajaFilas.querySelectorAll('[data-tipo-sistema]').forEach((inp) =>
+      inp.addEventListener('change', () => { lista[Number(inp.dataset.tipoSistema)].tipo = inp.value; })
+    );
+    cajaFilas.querySelectorAll('[data-colores]').forEach((inp) =>
+      inp.addEventListener('input', () => { lista[Number(inp.dataset.colores)].colores = inp.value; })
+    );
 
     cajaFilas.querySelectorAll('[data-nombre]').forEach((inp) =>
       inp.addEventListener('input', () => { lista[Number(inp.dataset.nombre)].nombre = inp.value; })
@@ -689,13 +830,20 @@ function dialogoSistemas(alGuardar) {
   pintarFilas();
 
   m.cuerpo.querySelector('[data-agregar]').addEventListener('click', () => {
-    lista.push({ id: crypto.randomUUID(), nombre: '', protegido: false, precio: 0 });
+    lista.push({ id: crypto.randomUUID(), nombre: '', tipo: '', colores: '', protegido: false, oculto: false, precio: 0 });
     pintarFilas();
   });
 
   m.cuerpo.querySelector('#ss-ok').onclick = async () => {
     const limpia = lista.map((s) => ({ ...s, nombre: s.nombre.trim() })).filter((s) => s.nombre);
-    const catalogoSistemas = limpia.map(({ id, nombre, protegido }) => ({ id, nombre, protegido: !!protegido }));
+    const catalogoSistemas = limpia.map(({ id, nombre, tipo, colores, protegido, oculto }) => ({
+      id,
+      nombre,
+      tipo: tipo || '',
+      colores: String(colores || '').split(',').map((x) => x.trim()).filter(Boolean),
+      protegido: !!protegido,
+      oculto: !!oculto,
+    }));
     const sistemas = Object.fromEntries(limpia.map((s) => [s.id, s.precio]));
     await guardarConfig({ catalogoSistemas, sistemas });
     m.cerrar();
