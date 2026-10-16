@@ -13,6 +13,10 @@ import { totalPedido, cobrado, saldo, venta } from './dinero.js';
 // de lista y no sobre el de contado (que ya viene con su descuento).
 const FINANCIACION = 'El precio de lista se puede abonar en 12 cuotas sin interés con cualquier tarjeta de crédito.';
 
+// Cuánto tarda el trabajo. Va arriba, al lado de la validez, que es donde el
+// cliente busca las fechas.
+const PLAZO_PRODUCCION = '10-15 días hábiles según cantidad y tipo de cortina.';
+
 export function montarHoja(html, tituloVentana, claseExtra = '') {
   document.querySelectorAll('.hoja').forEach((n) => n.remove());
   const hoja = document.createElement('div');
@@ -87,6 +91,10 @@ export function imprimirPresupuesto(p) {
       <div class="hoja__bloque">
         <h4>Validez</h4>
         Este presupuesto es válido por ${num(dias, 0)} días,<br>hasta el <strong>${fecha(validez)}</strong>.
+      </div>
+      <div class="hoja__bloque">
+        <h4>Plazo de producción</h4>
+        ${esc(PLAZO_PRODUCCION)}
       </div>
     </div>
 
