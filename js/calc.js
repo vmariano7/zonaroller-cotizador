@@ -7,15 +7,12 @@
 // pasa por el mismo incremento e igual conversión a contado/lista.
 // Ningún lado se cobra por debajo del metro: ver MINIMO_LADO_M.
 
-// Las telas de siempre: roller, verticales y paneles orientales se hacen con
-// las mismas. Son sólo el punto de partida — la lista se edita en Ajustes.
-const TELAS_COMUNES = ['Blackout', 'Sunscreen 5%', 'Sunscreen 1%', 'South Beach', 'Shangtung', 'Córdoba', 'Blackout decorativo'];
-
-// Las telas de roller, cada una con sus colores. El precio va por m² y se
-// carga en Ajustes; el color no lo cambia, salvo en Sun Screen 5%, donde cada
-// color puede tener el suyo (ver precioTela). Esto es sólo el punto de
-// partida: la lista entera se edita en Ajustes.
-const TELAS_ROLLER = [
+// Las telas de cortina, cada una con sus colores. Roller y bandas verticales
+// se hacen con las mismas, así que las dos arrancan con este catálogo y
+// después cada una se edita por separado en Ajustes. El precio va por m²; el
+// color no lo cambia, salvo en Sun Screen 5%, donde cada color puede tener el
+// suyo (ver precioTela).
+const TELAS_CORTINA = [
   { nombre: 'Black Out Vinílico EEUU', colores: ['Blanco', 'Beige', 'Gris', 'Ivory', 'Negro'] },
   { nombre: 'Black Out Vinílico ECO', colores: ['Blanco', 'Beige', 'Gris', 'Ivory'] },
   { nombre: 'Blackout Córdoba', colores: ['Nieve', 'Marfil', 'Centeno', 'Camel', 'Tostado', 'Grafito', 'Plomo'] },
@@ -35,18 +32,17 @@ const TELAS_ROLLER = [
   { nombre: 'Lux', colores: ['Blanco', 'Ivory', 'Beige', 'Chocolate', 'Esmeralda', 'Perla', 'Terracota', 'Rojo', 'Gris Cemento', 'Tostado'] },
 ];
 
+/** Una copia propia del catálogo, para que tocar un tipo no toque el otro. */
+const telasCortina = () => TELAS_CORTINA.map((t) => ({ ...t, colores: [...t.colores] }));
+
 export const TIPOS = {
   roller: {
     nombre: 'Roller',
-    telas: TELAS_ROLLER.map((t) => ({ ...t, colores: [...t.colores] })),
+    telas: telasCortina(),
   },
   vertical: {
     nombre: 'Bandas verticales',
-    telas: [...TELAS_COMUNES],
-  },
-  panel_oriental: {
-    nombre: 'Paneles orientales',
-    telas: [...TELAS_COMUNES],
+    telas: telasCortina(),
   },
   zebra: {
     nombre: 'Zebra',
@@ -75,20 +71,10 @@ export const SISTEMAS = {
   vertical_basico: { nombre: 'Vertical · Blackout / Sunscreen 5%', tipo: 'vertical', colores: [] },
   vertical_demas: { nombre: 'Vertical · Demás telas', tipo: 'vertical', colores: [] },
   zebra: { nombre: 'Sistema Zebra', tipo: 'zebra', colores: [] },
-  // Los paneles orientales se pueden hacer con tres sistemas distintos, uno
-  // por cantidad de canales del riel. Cuál va en cada cortina se elige a mano
-  // al cotizar (ver sistemasElegibles) y el costo de cada uno se carga en
-  // Ajustes; el nombre, en cambio, lo pone el código: son opciones fijas del
-  // cotizador, no sistemas sueltos.
-  // Ojo con la clave del primero: es la que ya venía, así que un renglón
-  // cotizado antes de que fueran tres sigue valiendo lo mismo.
-  panel_oriental: { nombre: 'Paneles orientales · 3 canales', tipo: 'panel_oriental', colores: [] },
-  panel_oriental_2: { nombre: 'Paneles orientales · 4 canales', tipo: 'panel_oriental', colores: [] },
-  panel_oriental_3: { nombre: 'Paneles orientales · 5 canales', tipo: 'panel_oriental', colores: [] },
 };
 
 /** Los tipos de cortina en los que el sistema se elige a mano al cotizar. */
-const ELIGE_SISTEMA = ['roller', 'panel_oriental'];
+const ELIGE_SISTEMA = ['roller'];
 
 /** El que viene puesto en una cortina nueva. El resto arranca sin elegir. */
 export const SISTEMA_POR_DEFECTO = { roller: 'roller_zenith_32' };
@@ -104,6 +90,9 @@ export function eligeSistema(tipo) {
  */
 function tipoDeSistemaPorId(id) {
   const clave = String(id || '');
+  // Los paneles orientales ya no se cotizan, pero la clave se sigue
+  // reconociendo para que esos sistemas no aparezcan más en Ajustes (ver
+  // TIPOS_RETIRADOS).
   if (clave.startsWith('panel_oriental')) return 'panel_oriental';
   if (clave.startsWith('roller')) return 'roller';
   if (clave.startsWith('vertical')) return 'vertical';
@@ -127,17 +116,18 @@ export function sistemaNormalizado(s) {
 }
 
 /**
- * Los tres sistemas de paneles orientales. Son los únicos cuyo nombre no se
- * edita en Ajustes: como el selector del cotizador ofrece estos tres y nada
- * más, el nombre sale de SISTEMAS para que las opciones se vean siempre
- * iguales, aunque el catálogo guardado tenga otra cosa. El costo sí se carga
- * en Ajustes, como el de cualquier otro.
+ * Tipos de cortina que ya no se cotizan. El nombre queda acá para que un
+ * presupuesto o un pedido de entonces siga diciendo de qué era, y para sacar
+ * de Ajustes los sistemas que quedaron colgados de ellos.
  */
-export const SISTEMAS_PANEL = ['panel_oriental', 'panel_oriental_2', 'panel_oriental_3'];
+const TIPOS_RETIRADOS = {
+  placa: 'Placas',
+  panel_oriental: 'Paneles orientales',
+};
 
-/** ¿El nombre de este sistema lo pone el código? */
-export function esSistemaFijo(id) {
-  return SISTEMAS_PANEL.includes(id);
+/** ¿Este sistema es de un tipo de cortina que ya no se cotiza? */
+function deTipoRetirado(sistema) {
+  return !!TIPOS_RETIRADOS[sistema?.tipo];
 }
 
 /**
@@ -168,15 +158,15 @@ export function coloresDeSistema(id, config) {
 /**
  * Los sistemas que hay para elegir en Ajustes: los guardados más los que el
  * cálculo puede asignar solo y todavía no estén en la lista. Sin esto, un
- * sistema nuevo (como el de paneles orientales) no aparecería nunca en un
- * config que se guardó antes de que existiera.
+ * sistema nuevo no aparecería nunca en un config que se guardó antes de que
+ * existiera. Los de un tipo de cortina retirado no se listan: no hay dónde
+ * usarlos, aunque sigan guardados con su costo por si hace falta mirar un
+ * presupuesto de entonces.
  */
 export function sistemasDeConfig(config) {
-  // Los tres de paneles orientales van con el nombre del código aunque el
-  // catálogo guardado tenga otro: ver SISTEMAS_PANEL.
-  const guardados = (config?.catalogoSistemas || []).map((s) => sistemaNormalizado(
-    esSistemaFijo(s.id) ? { ...s, ...SISTEMAS[s.id], id: s.id, protegido: true } : s
-  ));
+  const guardados = (config?.catalogoSistemas || [])
+    .map(sistemaNormalizado)
+    .filter((s) => !deTipoRetirado(s));
   const faltantes = Object.entries(SISTEMAS)
     .filter(([id]) => !guardados.some((s) => s.id === id))
     .map(([id, def]) => sistemaNormalizado({ id, ...def, protegido: true }));
@@ -188,6 +178,9 @@ export function sistemasDeConfig(config) {
  * para que agregar un tipo de cortina alcance con tocar un solo lugar.
  */
 export const NOMBRE_TIPO = {
+  // Los retirados van primero: si alguna clave volviera a usarse, gana la de
+  // ahora.
+  ...TIPOS_RETIRADOS,
   ...Object.fromEntries(Object.entries(TIPOS).map(([clave, def]) => [clave, def.nombre])),
   adicional: 'Adicional',
 };
@@ -198,7 +191,6 @@ export const NOMBRE_TIPO = {
  * `SISTEMAS` queda como default para configs viejas que todavía no lo tienen.
  */
 export function nombreSistema(id, config) {
-  if (esSistemaFijo(id)) return SISTEMAS[id].nombre;
   const enCatalogo = (config?.catalogoSistemas || []).find((s) => s.id === id);
   return enCatalogo?.nombre || SISTEMAS[id]?.nombre || id;
 }
@@ -272,16 +264,13 @@ export const ARMADO = {
 
 /**
  * Qué se elige en cada tipo. Las bandas verticales no llevan cadena, caída ni
- * caño: se recogen hacia un lado, así que van comando y recogimiento. Los
- * paneles orientales corren de la misma manera, sobre riel, así que llevan lo
- * mismo. La tela tradicional tiene los suyos propios (paños, pliegue,
- * recogimiento).
+ * caño: se recogen hacia un lado, así que van comando y recogimiento. La tela
+ * tradicional tiene los suyos propios (paños, pliegue, recogimiento).
  */
 export const ARMADO_POR_TIPO = {
   roller: ['comando', 'cadena', 'caida', 'sistemaCano'],
   zebra: ['comando', 'cadena', 'caida', 'sistemaCano'],
   vertical: ['comando', 'recogimientoVertical'],
-  panel_oriental: ['comando', 'recogimientoVertical'],
   tela_tradicional: [],
 };
 
@@ -294,15 +283,13 @@ export function configVacia() {
     // (renombrar) y borrar desde Ajustes. Arranca con las de siempre para que
     // no cambie nada hasta que lo toques.
     catalogoTelas: {
-      roller: TIPOS.roller.telas.map((t) => ({ ...t, colores: [...t.colores] })),
-      vertical: [...TIPOS.vertical.telas],
-      panel_oriental: [...TIPOS.panel_oriental.telas],
+      roller: telasCortina(),
+      vertical: telasCortina(),
       zebra: [...TIPOS.zebra.telas],
     },
     telas: {
-      roller: cero(TIPOS.roller.telas.map((t) => t.nombre)),
-      vertical: cero(TIPOS.vertical.telas),
-      panel_oriental: cero(TIPOS.panel_oriental.telas),
+      roller: cero(TELAS_CORTINA.map((t) => t.nombre)),
+      vertical: cero(TELAS_CORTINA.map((t) => t.nombre)),
       zebra: cero(TIPOS.zebra.telas),
     },
     // Catálogo de sistemas: igual que las telas, editable desde Ajustes.
@@ -310,8 +297,17 @@ export function configVacia() {
     // se pueden renombrar o borrar igual, pero Ajustes avisa antes de borrarlos.
     catalogoSistemas: Object.entries(SISTEMAS).map(([id, def]) => sistemaNormalizado({ id, ...def, protegido: true })),
     sistemas: Object.fromEntries(Object.keys(SISTEMAS).map((id) => [id, 0])),
-    // Telas que usan el sistema "básico" (más económico) en roller y vertical.
-    telasSistemaBasico: ['Blackout', 'Sunscreen 5%'],
+    // Telas que usan el sistema "básico" (el más económico) en roller y
+    // vertical: los blackouts y las Sun Screen 5%, que es justo lo que dice el
+    // nombre del sistema de verticales. El resto usa el de "demás telas".
+    // Los dos primeros son los nombres que tenía el catálogo anterior: quedan
+    // en la lista para que un renglón cotizado entonces siga saliendo con el
+    // mismo sistema que salió ese día.
+    telasSistemaBasico: [
+      'Blackout', 'Sunscreen 5%',
+      'Black Out Vinílico EEUU', 'Black Out Vinílico ECO', 'Blackout Córdoba',
+      'Sun Screen 5%', 'Sun Screen 5% Bicolor', 'Sun Screen 5% ECO',
+    ],
     // Adicionales: catálogo de productos simples (nombre + precio por unidad)
     // que se carga enteramente desde Ajustes. El precio es de contado.
     // Ver calcularItemAdicional.
@@ -319,14 +315,13 @@ export function configVacia() {
     incrementos: {
       roller: { activo: true, valor: 0 },
       vertical: { activo: true, valor: 0 },
-      panel_oriental: { activo: true, valor: 0 },
       zebra: { activo: true, valor: 0 },
       tela_tradicional: { activo: true, valor: 0 },
       adicional: { activo: true, valor: 0 },
     },
     // Lo que te sale el instalador. Se traslada al precio final de la cortina:
     // al cliente no se le cobra aparte, ya viene adentro. Ver costoInstaladorItem.
-    instalador: { roller: 15000, vertical: 20000, panel_oriental: 0, recargoPct: 50 },
+    instalador: { roller: 15000, vertical: 20000, recargoPct: 50 },
     // Cortina "solo tela": el cliente ya tiene el sistema y se le vende la tela
     // sola. Es un descuento fijo, igual para todos los modelos, que se resta
     // del precio de contado (el de lista sale de ahí). El importe real se
@@ -560,15 +555,14 @@ const ladoCobrado = (metros) => Math.max(MINIMO_LADO_M, Number(metros) || 0);
 
 /**
  * Con qué tarifa de instalación se cobra cada tipo. Roller y zebra van con la
- * misma; verticales y tela tradicional comparten la más cara; los paneles
- * orientales tienen la suya. Lo que no esté acá usa la de roller.
+ * misma y verticales y tela tradicional comparten la más cara. Lo que no esté
+ * acá usa la de roller.
  */
 const TARIFA_INSTALADOR = {
   roller: 'roller',
   zebra: 'roller',
   vertical: 'vertical',
   tela_tradicional: 'vertical',
-  panel_oriental: 'panel_oriental',
 };
 
 /** Solo las roller se automatizan. */
@@ -614,7 +608,7 @@ export function costoInstaladorItem(item, config, { cortinasTotales = 1 } = {}) 
 /**
  * Tipos cuyo sistema se elige según la tela: los que están en
  * `telasSistemaBasico` usan el económico y el resto el de "demás telas".
- * Zebra y paneles orientales tienen un solo sistema, así que no se dividen.
+ * Zebra tiene un solo sistema, así que no se divide.
  */
 export function usaSistemaBasico(tipo) {
   return tipo === 'roller' || tipo === 'vertical';

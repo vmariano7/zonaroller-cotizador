@@ -2,7 +2,7 @@
 // sincronización con la nube y respaldos.
 
 import { estado, guardarConfig, cerrarSesion, sincronizar, exportarRespaldo, importarRespaldo } from '../store.js';
-import { TIPOS, CATEGORIA, sistemasDeConfig, usaSistemaBasico, esSistemaFijo, telasDeTipo, precioBaseTela, eligeSistema } from '../calc.js';
+import { TIPOS, CATEGORIA, sistemasDeConfig, usaSistemaBasico, telasDeTipo, precioBaseTela, eligeSistema } from '../calc.js';
 import { esc, aviso, confirmar, descargarArchivo, fecha, plata, modal } from '../ui.js';
 import { plantillaDe, CLAVES } from '../mensaje.js';
 import { tienePin, definirPin } from '../candado.js';
@@ -126,12 +126,6 @@ export function render(contenedor) {
           </div>
         </div>
         <div class="campo" style="display:flex;align-items:center;gap:.6rem">
-          <label style="flex:1;margin:0;font-weight:500;color:var(--acento)">Paneles orientales</label>
-          <div class="con-prefijo" style="width:140px"><span>$</span>
-            <input type="number" inputmode="decimal" min="0" step="1" data-inst="panel_oriental" value="${c.instalador?.panel_oriental ?? 0}">
-          </div>
-        </div>
-        <div class="campo" style="display:flex;align-items:center;gap:.6rem">
           <label style="flex:1;margin:0;font-weight:500">Recargo</label>
           <div class="con-sufijo" style="width:140px">
             <input type="number" inputmode="decimal" min="0" step="1" data-inst="recargoPct" value="${c.instalador?.recargoPct ?? 50}"><span>%</span>
@@ -197,7 +191,7 @@ export function render(contenedor) {
             </div>`;
           }).join('')}
           <div class="banner banner--info" style="margin:1rem 0 0">
-            <div>En Roller, Verticales, Paneles orientales y Zebra el incremento se calcula sobre
+            <div>En Roller, Verticales y Zebra el incremento se calcula sobre
             tela y sistema. En Tela Tradicional, sobre la fórmula fija del renglón de arriba, y en
             Adicionales sobre el precio de cada unidad. La instalación se suma después, sin
             incremento.</div>
@@ -586,10 +580,11 @@ export function render(contenedor) {
 }
 
 /**
- * Carga una lista de precios: telas y sistemas con sus colores y sus valores.
- * Se mezcla con lo que ya está cargado —lo que no viene en el archivo queda
- * como está, así los presupuestos viejos siguen encontrando sus telas y sus
- * sistemas— y no toca ninguna otra parte de la configuración.
+ * Carga una lista de precios: telas y sistemas con sus colores y sus valores,
+ * y de paso qué telas usan el sistema básico. Se mezcla con lo que ya está
+ * cargado —lo que no viene en el archivo queda como está, así los presupuestos
+ * viejos siguen encontrando sus telas y sus sistemas— y no toca ninguna otra
+ * parte de la configuración.
  */
 async function importarListaDePrecios(datos) {
   const c = estado.config;
@@ -615,6 +610,12 @@ async function importarListaDePrecios(datos) {
   if (datos.sistemas) {
     cambios.sistemas = { ...c.sistemas, ...datos.sistemas };
     cuenta.sistemas = Object.keys(datos.sistemas).length;
+  }
+  // Las telas del sistema básico se suman a las que ya estaban tildadas: las de
+  // antes se dejan en paz para que un renglón viejo siga saliendo con el mismo
+  // sistema con el que se cotizó.
+  if (Array.isArray(datos.telasSistemaBasico)) {
+    cambios.telasSistemaBasico = [...new Set([...(c.telasSistemaBasico || []), ...datos.telasSistemaBasico])];
   }
   if (!Object.keys(cambios).length) throw new Error('El archivo no trae telas ni sistemas.');
 
@@ -750,31 +751,28 @@ function dialogoTelas(tipo, alGuardar) {
 }
 
 /**
- * Agregar, renombrar o borrar sistemas. Los 5 que arma el cálculo automático
- * (roller/vertical × básico/demás, y zebra) se pueden renombrar o borrar
- * igual que cualquier otro: si se borra uno que el cálculo sigue necesitando,
- * esa combinación de tela pasa a costar $0 de sistema hasta que se cargue uno
+ * Agregar, renombrar o borrar sistemas. Los que arma el cálculo automático
+ * (vertical × básico/demás, y zebra) se pueden renombrar o borrar igual que
+ * cualquier otro: si se borra uno que el cálculo sigue necesitando, esa
+ * combinación de tela pasa a costar $0 de sistema hasta que se cargue uno
  * nuevo (igual que cualquier costo sin cargar en esta app).
  *
- * Los tres de paneles orientales son la excepción: el nombre lo pone el
- * cotizador (ver SISTEMAS_PANEL) porque son las opciones del selector, así que
- * acá sólo se les carga el costo y no se pueden renombrar ni borrar. Un
- * sistema agregado a mano, en cambio, no queda atado a ningún tipo de cortina:
- * queda para cargarle un costo, pero el cotizador no lo ofrece en ningún lado.
+ * Un sistema agregado a mano sin tipo de cortina no queda atado a nada: queda
+ * para cargarle un costo, pero el cotizador no lo ofrece en ningún lado. Para
+ * que aparezca al cotizar una roller, hay que elegirle el tipo.
  */
 function dialogoSistemas(alGuardar) {
   // La lista sale de sistemasDeConfig y no del catálogo guardado a secas: así
-  // los sistemas que el cálculo conoce pero el config todavía no tiene (los de
-  // paneles orientales, sin ir más lejos) aparecen acá, y guardar no les borra
-  // el costo por no haber estado en la lista.
+  // los sistemas que el cálculo conoce pero el config todavía no tiene
+  // aparecen acá, y guardar no les borra el costo por no haber estado en la
+  // lista.
   let lista = sistemasDeConfig(estado.config).map((s) => ({ ...s, colores: s.colores.join(', '), precio: Number(estado.config.sistemas?.[s.id]) || 0 }));
 
   const m = modal('Sistemas', `
     <div class="mini mb-16">Agregá, renombrá o borrá sistemas. Cada uno va atado a un tipo de cortina:
-    si ese tipo elige sistema a mano (roller, paneles orientales), aparece en el selector al cotizar.
-    Los colores van separados por coma. Los marcados con ★ los pone el cotizador: o los elige solo el
-    cálculo según la tela, o son las tres opciones de paneles orientales, que ya vienen con el nombre
-    puesto y sólo necesitan que les cargues el costo.</div>
+    en roller el sistema se elige a mano al cotizar, así que todos los de roller aparecen en ese
+    selector; en los demás tipos lo elige solo el cálculo según la tela. Los colores van separados
+    por coma. Los marcados con ★ son los que asigna el cálculo.</div>
     <div data-filas></div>
     <button class="btn btn--chico mt-16" data-agregar style="width:100%">+ Agregar sistema</button>
     <div class="fila-botones fila-botones--fin mt-16">
@@ -788,17 +786,15 @@ function dialogoSistemas(alGuardar) {
     cajaFilas.innerHTML = lista.map((s, i) => `
       <div class="campo" style="margin-bottom:.7rem${s.oculto ? ';opacity:.6' : ''}">
         <div style="display:flex;align-items:center;gap:.5rem">
-          <input data-nombre="${i}" placeholder="Nombre del sistema" value="${esc(s.nombre)}" style="flex:1"${esSistemaFijo(s.id) ? ' readonly title="Es una de las tres opciones de paneles orientales: el nombre lo pone el cotizador"' : ''}>
-          ${s.protegido ? `<span class="mini" title="${esSistemaFijo(s.id) ? 'Opción fija del selector de paneles orientales' : 'Lo asigna solo el cálculo'}">★</span>` : ''}
+          <input data-nombre="${i}" placeholder="Nombre del sistema" value="${esc(s.nombre)}" style="flex:1">
+          ${s.protegido ? '<span class="mini" title="Lo asigna solo el cálculo">★</span>' : ''}
           <div class="con-prefijo" style="width:140px"><span>$</span>
             <input type="number" inputmode="decimal" min="0" step="1" data-precio="${i}" value="${s.precio}">
           </div>
-          ${esSistemaFijo(s.id)
-            ? '<span class="btn-icono" style="visibility:hidden"></span>'
-            : `<button class="btn-icono" data-quitar="${i}" title="Quitar">&#10005;</button>`}
+          <button class="btn-icono" data-quitar="${i}" title="Quitar">&#10005;</button>
         </div>
         <div style="display:flex;align-items:center;gap:.5rem;margin-top:.35rem">
-          <select data-tipo-sistema="${i}" style="width:190px"${esSistemaFijo(s.id) ? ' disabled' : ''}>
+          <select data-tipo-sistema="${i}" style="width:190px">
             <option value="">Sin tipo de cortina</option>
             ${Object.entries(TIPOS).map(([clave, def]) => `<option value="${clave}"${s.tipo === clave ? ' selected' : ''}>${esc(def.nombre)}</option>`).join('')}
           </select>
