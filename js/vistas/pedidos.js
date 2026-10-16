@@ -89,16 +89,23 @@ export async function crearPedidoDesdePresupuesto(p) {
 /* ---------- Listado ---------- */
 
 export function render(contenedor) {
-  const abiertos = estado.pedidos.filter((p) => !['instalado', 'cancelado'].includes(p.estado));
+  // El instalador ve sólo los que están listos para instalar: son los que
+  // tiene que ir a hacer. Ver permisos.js.
+  const todos = puede('pedidosTodos');
+  const suyos = todos ? estado.pedidos : estado.pedidos.filter((p) => p.estado === 'listo');
+  const abiertos = suyos.filter((p) => !['instalado', 'cancelado'].includes(p.estado));
   const porCobrar = abiertos.reduce((a, p) => a + Math.max(0, saldo(p)), 0);
 
   contenedor.innerHTML = `
     <div class="titulo-pagina">
-      <div><h1>Pedidos</h1><div class="sub">${abiertos.length} en curso · ${plata(porCobrar)} por cobrar</div></div>
+      <div><h1>Pedidos</h1><div class="sub">${todos
+        ? `${abiertos.length} en curso · ${plata(porCobrar)} por cobrar`
+        : `${suyos.length} listo${suyos.length === 1 ? '' : 's'} para instalar · ${plata(porCobrar)} a cobrar`}</div></div>
+      ${puede('editarPedidos') ? `
       <div class="der">
         <a class="btn" href="#/presupuestos">Desde un presupuesto</a>
         <a class="btn btn--primario" href="#/pedido-nuevo">+ Pedido desde cero</a>
-      </div>
+      </div>` : ''}
     </div>
     ${puede('resumenVentas') ? `
     <div class="tarjeta mb-16">
@@ -117,12 +124,13 @@ export function render(contenedor) {
       <div class="mt-16" data-resumen></div>
     </div>` : ''}
 
-    <div class="campos campos--2 mb-16">
+    <div class="campos campos--${todos ? '2' : '1'} mb-16">
       <input data-buscar placeholder="Buscar por cliente, número o dirección…">
+      ${todos ? `
       <select data-filtro>
         <option value="">Todos los estados</option>
         ${Object.entries(ESTADOS_PEDIDO).map(([k, v]) => `<option value="${k}">${v.texto}</option>`).join('')}
-      </select>
+      </select>` : ''}
     </div>
     <div class="lista" data-lista></div>
   `;
@@ -215,8 +223,8 @@ export function render(contenedor) {
 
   function pintar() {
     const q = inputBuscar.value.trim().toLowerCase();
-    const f = selFiltro.value;
-    const items = estado.pedidos
+    const f = selFiltro?.value || '';
+    const items = suyos
       .filter((p) => !f || p.estado === f)
       .filter((p) => {
         if (!q) return true;
@@ -226,8 +234,9 @@ export function render(contenedor) {
 
     if (!items.length) {
       lista.innerHTML = vacio(
-        estado.pedidos.length ? 'Ningún pedido coincide con la búsqueda.' : 'Todavía no tenés pedidos confirmados.',
-        '<a class="btn btn--primario" href="#/pedido-nuevo">Cargar un pedido</a>'
+        suyos.length ? 'Ningún pedido coincide con la búsqueda.'
+          : todos ? 'Todavía no tenés pedidos confirmados.' : 'No hay pedidos listos para instalar.',
+        puede('editarPedidos') ? '<a class="btn btn--primario" href="#/pedido-nuevo">Cargar un pedido</a>' : ''
       );
       return;
     }
@@ -251,7 +260,7 @@ export function render(contenedor) {
           <div class="item-lista__titulo">${esc(p.cliente?.nombre || 'Sin nombre')} ${chip(ESTADOS_PEDIDO, p.estado)}</div>
           <div class="mini">${esc(p.numero)} · ${fecha(p.fecha)}${p.fechaInstalacion ? ` · instala ${fecha(p.fechaInstalacion)}` : ''}${p.cliente?.direccion ? ` · ${esc(p.cliente.direccion)}` : ''}</div>
         </div>
-        <div class="item-lista__monto">${plata(totalPedido(p))}
+        <div class="item-lista__monto">${puede('pedidoCompleto') ? plata(totalPedido(p)) : ''}
           <div class="mini" style="font-weight:600;color:${s > 0 ? 'var(--rojo)' : 'var(--verde)'}">${s > 0 ? `debe ${plata(s)}` : 'pagado'}</div>
         </div>
       </div>`);
@@ -264,7 +273,7 @@ export function render(contenedor) {
   }
 
   inputBuscar.addEventListener('input', pintar);
-  selFiltro.addEventListener('change', pintar);
+  selFiltro?.addEventListener('change', pintar);
   pintar();
 }
 
@@ -347,6 +356,9 @@ export function renderDetalle(contenedor, params) {
     contenedor.innerHTML = vacio('No encontré ese pedido.', '<a class="btn" href="#/pedidos">Volver al listado</a>');
     return;
   }
+
+  // El instalador no ve la ficha entera: ve la hoja de ruta, acá abajo.
+  if (!puede('pedidoCompleto')) return renderHojaDeRuta(contenedor, p);
 
   const t = calcularTotales(p.items, estado.config, { descuentoPct: p.descuentoPct });
   const v = venta(p);
@@ -682,4 +694,94 @@ export function renderDetalle(contenedor, params) {
     m.cuerpo.querySelector('#pg-ok').onclick = () => registrar(false);
     m.cuerpo.querySelector('#pg-ok-recibo').onclick = () => registrar(true);
   });
+}
+
+/* ---------- Hoja de ruta (instalador) ---------- */
+
+/**
+ * Lo que ve el instalador de un pedido: lo justo para ir a instalarlo.
+ * El cliente, cómo ubicarlo, cuánto tiene que cobrar al terminar y la orden
+ * de trabajo. Nada de precios de venta, pagos, costos ni seguimiento: para
+ * eso está la ficha completa, que es de los otros roles (ver permisos.js).
+ */
+function renderHojaDeRuta(contenedor, p) {
+  // Un pedido que todavía no está listo no es asunto suyo, ni aunque entre
+  // escribiendo la dirección a mano.
+  if (!puede('pedidosTodos') && p.estado !== 'listo') {
+    contenedor.innerHTML = vacio(
+      'Ese pedido no está listo para instalar.',
+      '<a class="btn" href="#/pedidos">Volver al listado</a>'
+    );
+    return;
+  }
+
+  const t = calcularTotales(p.items, estado.config, { descuentoPct: p.descuentoPct });
+  const debe = saldo(p);
+  const cli = p.cliente || {};
+  const tel = String(cli.telefono || '').replace(/\D/g, '');
+  const wsp = tel.length >= 8 ? `https://wa.me/${tel.length > 10 ? tel : `549${tel}`}` : '';
+  const domicilio = [cli.direccion, cli.ciudad].filter(Boolean).join(', ');
+
+  contenedor.innerHTML = `
+    <div class="titulo-pagina">
+      <div>
+        <h1>${esc(p.numero)} ${chip(ESTADOS_PEDIDO, p.estado)}</h1>
+        <div class="sub">${p.fechaInstalacion ? `Instalación ${fecha(p.fechaInstalacion)}` : 'Instalación a coordinar'} · ${frasearUnidades(t.unidades)}</div>
+      </div>
+      <div class="der">
+        <button class="btn btn--primario" data-ot>Orden de trabajo</button>
+      </div>
+    </div>
+
+    <div class="grid grid--2">
+      <div class="tarjeta">
+        <div class="tarjeta__cab"><h2>El cliente</h2></div>
+        <table>
+          <tbody>
+            <tr><td class="mini">Nombre</td><td><strong>${esc(cli.nombre || 'Sin nombre')}</strong></td></tr>
+            <tr><td class="mini">Teléfono</td><td>${esc(cli.telefono || '—')}</td></tr>
+            <tr><td class="mini">Dirección</td><td>${esc(domicilio || '—')}</td></tr>
+          </tbody>
+        </table>
+        <div class="fila-botones mt-16">
+          ${cli.telefono ? `<a class="btn btn--chico" href="tel:${esc(cli.telefono)}">Llamar</a>` : ''}
+          ${wsp ? `<a class="btn btn--chico" href="${esc(wsp)}" target="_blank" rel="noopener">WhatsApp</a>` : ''}
+          ${domicilio ? `<a class="btn btn--chico" href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(domicilio)}" target="_blank" rel="noopener">Cómo llegar</a>` : ''}
+        </div>
+      </div>
+
+      <div class="tarjeta">
+        <div class="tarjeta__cab"><h2>Qué hay que cobrar</h2></div>
+        <div class="kpis">
+          <div class="kpi ${debe > 0 ? 'kpi--rojo' : 'kpi--verde'}">
+            <div class="kpi__etiqueta">Saldo</div>
+            <div class="kpi__valor">${plata(Math.max(0, debe))}</div>
+            <div class="kpi__pie">${debe > 0 ? 'a cobrar al terminar' : 'el pedido ya está pagado'}</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="tarjeta">
+      <div class="tarjeta__cab"><h2>Qué se instala</h2></div>
+      <div class="tabla-scroll">
+        <table>
+          <thead><tr><th>Ambiente</th><th>Tipo y tela</th><th class="num">Medidas</th><th class="num">Cant.</th><th>Sistema</th></tr></thead>
+          <tbody>
+            ${t.lineas.map(({ item, calc }) => `
+              <tr>
+                <td>${esc(item.ambiente || '—')}${armado(item) ? `<div class="mini">${esc(armado(item))}</div>` : ''}</td>
+                <td>${esc(NOMBRE_TIPO[item.tipo] || item.tipo)}<div class="mini">${esc(descripcionItem(item) || telaConColor(item))}</div></td>
+                <td class="num">${medidaTexto(item, calc)}</td>
+                <td class="num">${calc.cantidad}</td>
+                <td class="mini">${calc.soloTela ? 'Solo tela (sin sistema)' : esc(calc.sistemaNombre)}</td>
+              </tr>`).join('')}
+          </tbody>
+        </table>
+      </div>
+      ${p.notas ? `<div class="mt-16 mini"><strong>Observaciones:</strong> ${esc(p.notas)}</div>` : ''}
+    </div>
+  `;
+
+  contenedor.querySelector('[data-ot]').addEventListener('click', () => imprimirOrdenTrabajo(p));
 }

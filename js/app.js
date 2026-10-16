@@ -31,14 +31,14 @@ const ICONOS = {
 // Las cinco de todos los días van en la barra de abajo del celular.
 const PRIMARIAS = [
   { nav: 'cotizar', ruta: '/cotizar', texto: 'Cotizar' },
-  { nav: 'presupuestos', ruta: '/presupuestos', texto: 'Presupuestos' },
+  { nav: 'presupuestos', ruta: '/presupuestos', texto: 'Presupuestos', permiso: 'presupuestos' },
   { nav: 'pedidos', ruta: '/pedidos', texto: 'Pedidos' },
-  { nav: 'agenda', ruta: '/agenda', texto: 'Agenda' },
+  { nav: 'agenda', ruta: '/agenda', texto: 'Agenda', permiso: 'agenda' },
 ];
 // El resto entra por "Más" en el celular; en la compu se ven todas.
 const SECUNDARIAS = [
   { nav: 'caja', ruta: '/caja', texto: 'Caja', permiso: 'caja' },
-  { nav: 'clientes', ruta: '/clientes', texto: 'Clientes' },
+  { nav: 'clientes', ruta: '/clientes', texto: 'Clientes', permiso: 'clientes' },
   { nav: 'reportes', ruta: '/reportes', texto: 'Reportes', permiso: 'reportes' },
   { nav: 'config', ruta: '/config', texto: 'Ajustes', permiso: 'ajustes' },
 ];
@@ -52,7 +52,7 @@ const visibles = (lista) => lista.filter((n) => !n.permiso || puede(n.permiso));
  */
 const protegida = (permiso, vista) => (contenedor, params) => {
   if (puede(permiso)) return vista(contenedor, params);
-  contenedor.innerHTML = '<div class="vacio"><p>Esta sección es solo para el dueño.</p><a class="btn" href="#/cotizar">Ir al cotizador</a></div>';
+  contenedor.innerHTML = '<div class="vacio"><p>Esta sección no está habilitada para tu usuario.</p><a class="btn" href="#/cotizar">Ir al cotizador</a></div>';
 };
 
 const icono = (nombre) =>
@@ -62,16 +62,16 @@ definirRutas([
   { patron: '/cotizar', nav: 'cotizar', vista: vCotizar.render },
   { patron: '/cotizar/nuevo/:categoria', nav: 'cotizar', vista: vCotizar.render },
   { patron: '/cotizar/:id', nav: 'cotizar', vista: vCotizar.render },
-  { patron: '/presupuestos', nav: 'presupuestos', vista: vPresupuestos.render },
-  { patron: '/presupuesto/:id', nav: 'presupuestos', vista: vPresupuestos.renderDetalle },
+  { patron: '/presupuestos', nav: 'presupuestos', vista: protegida('presupuestos', vPresupuestos.render) },
+  { patron: '/presupuesto/:id', nav: 'presupuestos', vista: protegida('presupuestos', vPresupuestos.renderDetalle) },
   { patron: '/pedidos', nav: 'pedidos', vista: vPedidos.render },
-  { patron: '/pedido-nuevo', nav: 'pedidos', vista: vPedidos.renderEditor },
-  { patron: '/pedido-editar/:id', nav: 'pedidos', vista: vPedidos.renderEditor },
+  { patron: '/pedido-nuevo', nav: 'pedidos', vista: protegida('editarPedidos', vPedidos.renderEditor) },
+  { patron: '/pedido-editar/:id', nav: 'pedidos', vista: protegida('editarPedidos', vPedidos.renderEditor) },
   { patron: '/pedido/:id', nav: 'pedidos', vista: vPedidos.renderDetalle },
-  { patron: '/clientes', nav: 'clientes', vista: vClientes.render },
-  { patron: '/cliente/:clave', nav: 'clientes', vista: vClientes.renderDetalle },
+  { patron: '/clientes', nav: 'clientes', vista: protegida('clientes', vClientes.render) },
+  { patron: '/cliente/:clave', nav: 'clientes', vista: protegida('clientes', vClientes.renderDetalle) },
   { patron: '/caja', nav: 'caja', vista: protegida('caja', vCaja.render) },
-  { patron: '/agenda', nav: 'agenda', vista: vAgenda.render },
+  { patron: '/agenda', nav: 'agenda', vista: protegida('agenda', vAgenda.render) },
   { patron: '/reportes', nav: 'reportes', vista: protegida('reportes', vReportes.render) },
   { patron: '/config', nav: 'config', vista: protegida('ajustes', vConfig.render) },
 ]);
