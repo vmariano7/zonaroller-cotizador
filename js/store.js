@@ -11,6 +11,7 @@
 // Si alguna de las dos se desactiva, esta clave pasa a ser una puerta abierta.
 
 import { configVacia } from './calc.js';
+import { migrarConfig } from './migraciones.js';
 
 export const SUPABASE = {
   url: 'https://jnldoyyctyvxgwngwqsl.supabase.co',
@@ -202,6 +203,7 @@ export async function iniciar() {
   avisar();
 
   if (s) await sincronizar();
+  else await aplicarMigraciones();
   return estado;
 }
 
@@ -215,6 +217,8 @@ export async function sincronizar() {
   estado.sync = { ...estado.sync, activa: true, estado: 'sincronizando', mensaje: 'Sincronizando…' };
   avisar();
 
+  let faltaSubirConfig = false;
+
   try {
     const [config, ...resto] = await Promise.all([
       pedir(`${TABLAS.config}?select=*&id=eq.principal`),
@@ -222,7 +226,16 @@ export async function sincronizar() {
     ]);
 
     if (Array.isArray(config) && config[0]?.datos) {
-      estado.config = { ...configVacia(), ...config[0].datos };
+      // La config de la nube manda, salvo que la de acá sea más nueva y todavía
+      // no haya subido (se guardó algo sin señal, o falló el envío). En ese
+      // caso gana la de acá y se sube: lo último que cargaste no se pierde.
+      const deLaNube = config[0].datos;
+      const cuando = (c, fila) => Date.parse(c?.actualizado || fila?.actualizado || '') || 0;
+      if (cuando(deLaNube, config[0]) >= cuando(estado.config)) {
+        estado.config = { ...configVacia(), ...deLaNube };
+      } else {
+        faltaSubirConfig = true;
+      }
     }
     COLECCIONES.forEach((c, i) => {
       const filas = resto[i];
@@ -236,6 +249,7 @@ export async function sincronizar() {
       mensaje: 'Sincronizado con la nube',
       ultima: new Date().toISOString(),
     };
+    if (faltaSubirConfig) await guardarConfig({});
   } catch (err) {
     console.error(err);
     estado.sync = {
@@ -245,7 +259,21 @@ export async function sincronizar() {
       ultima: estado.sync.ultima,
     };
   }
+  // Va al final y fuera del try: si el código trae un catálogo nuevo, hay que
+  // acomodarlo tanto sobre lo que bajó de la nube como sobre lo que quedó acá
+  // cuando no hubo señal.
+  await aplicarMigraciones();
   avisar();
+}
+
+/**
+ * Pone al día la config guardada cuando el código trae novedades que la mezcla
+ * no alcanza a traer sola (catálogos nuevos de telas y sistemas). Nunca toca
+ * precios. Ver migraciones.js.
+ */
+async function aplicarMigraciones() {
+  const cambios = migrarConfig(estado.config);
+  if (cambios) await guardarConfig(cambios);
 }
 
 /* ---------- Escritura ---------- */
@@ -273,7 +301,9 @@ async function subirFila(coleccion, registro) {
 }
 
 export async function guardarConfig(nuevaConfig) {
-  estado.config = { ...estado.config, ...nuevaConfig };
+  // La hora del último cambio viaja adentro de la config: con eso se decide,
+  // al sincronizar, si manda la de acá o la de la nube.
+  estado.config = { ...estado.config, ...nuevaConfig, actualizado: new Date().toISOString() };
   escribirLocal();
   avisar();
 

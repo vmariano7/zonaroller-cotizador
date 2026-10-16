@@ -27,6 +27,19 @@ function guardarPronto(parcial) {
 export function render(contenedor) {
   const c = estado.config;
 
+  // Lo que todavía no tiene costo cargado. Hasta que lo tenga cotiza en $0, y
+  // el aviso va arriba de todo porque es acá donde se carga. Los sistemas
+  // ocultos no cuentan: son de versiones anteriores y no se ofrecen al cotizar.
+  const tiposConTela = Object.keys(TIPOS).filter((t) => t !== 'tela_tradicional');
+  const telasSinCosto = tiposConTela
+    .flatMap((tipo) => telasDeTipo(tipo, c).filter((t) => !(precioBaseTela(tipo, t.nombre, c) > 0)));
+  const sistemasSinCosto = sistemasDeConfig(c).filter((sis) => !sis.oculto && !(Number(c.sistemas?.[sis.id]) > 0));
+  const cuantos = (n, singular, plural) => (n === 1 ? `1 ${singular}` : `${n} ${plural}`);
+  const faltan = [
+    telasSinCosto.length ? cuantos(telasSinCosto.length, 'tela', 'telas') : '',
+    sistemasSinCosto.length ? cuantos(sistemasSinCosto.length, 'sistema', 'sistemas') : '',
+  ].filter(Boolean).join(' y ');
+
   contenedor.innerHTML = `
     <div class="titulo-pagina">
       <div><h1>Configuración</h1><div class="sub">Los cambios se guardan solos</div></div>
@@ -71,6 +84,13 @@ export function render(contenedor) {
             }).join('')}
           </div>`).join('')}
       </div>
+      ${faltan ? `
+      <div class="banner banner--aviso" style="margin-top:1rem">
+        <div><strong>Faltan costos:</strong> ${faltan} sin precio cargado. Mientras tanto, lo que
+        las use cotiza en $0. Cargalos acá abajo uno por uno, o traelos todos juntos con
+        <label class="btn btn--chico" style="margin:0 .2rem;vertical-align:baseline">Importar lista de precios<input type="file" accept="application/json,.json" data-importar-precios hidden></label>
+        (el archivo <strong>lista-precios.json</strong> de la carpeta privada).</div>
+      </div>` : ''}
       <div class="banner banner--info" style="margin-top:1rem">
         <div><strong>Cortina Tela Tradicional</strong> no usa estos costos: su precio base sale de una fórmula fija propia (ancho, alto y ancho×alto), configurada directamente en el código. El porcentaje de ganancia sobre esa fórmula sí se configura, en Incrementos.</div>
       </div>
@@ -545,19 +565,28 @@ export function render(contenedor) {
     aviso('Respaldo descargado.');
   });
 
-  contenedor.querySelector('[data-importar-precios]').addEventListener('change', async (e) => {
-    const archivo = e.target.files?.[0];
-    if (!archivo) return;
-    try {
-      const datos = JSON.parse(await archivo.text());
-      const cuenta = await importarListaDePrecios(datos);
-      aviso(`Lista cargada: ${cuenta.telas} telas y ${cuenta.sistemas} sistemas.`);
-      render(contenedor);
-    } catch (err) {
-      aviso(`No pude leer el archivo. ${err.message}`, 'error');
-    }
-    e.target.value = '';
-  });
+  // Hay dos botones iguales: el del aviso de "faltan costos" y el de Respaldo.
+  contenedor.querySelectorAll('[data-importar-precios]').forEach((inp) =>
+    inp.addEventListener('change', async (e) => {
+      const archivo = e.target.files?.[0];
+      if (!archivo) return;
+      try {
+        const datos = JSON.parse(await archivo.text());
+        const cuenta = await importarListaDePrecios(datos);
+        // Si la nube rechazó el guardado, la lista quedó sólo en este aparato:
+        // mejor decirlo acá que dejar que se pierda en el próximo arranque.
+        const enLaNube = estado.sync.estado !== 'error';
+        aviso(
+          `Lista cargada: ${cuenta.telas} telas y ${cuenta.sistemas} sistemas.${enLaNube ? '' : ' Ojo: todavía no subió a la nube.'}`,
+          enLaNube ? 'ok' : 'error'
+        );
+        render(contenedor);
+      } catch (err) {
+        aviso(`No pude leer el archivo. ${err.message}`, 'error');
+      }
+      e.target.value = '';
+    })
+  );
 
   contenedor.querySelector('[data-importar]').addEventListener('change', async (e) => {
     const archivo = e.target.files?.[0];

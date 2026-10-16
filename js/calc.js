@@ -12,7 +12,7 @@
 // después cada una se edita por separado en Ajustes. El precio va por m²; el
 // color no lo cambia, salvo en Sun Screen 5%, donde cada color puede tener el
 // suyo (ver precioTela).
-const TELAS_CORTINA = [
+export const TELAS_CORTINA = [
   { nombre: 'Black Out Vinílico EEUU', colores: ['Blanco', 'Beige', 'Gris', 'Ivory', 'Negro'] },
   { nombre: 'Black Out Vinílico ECO', colores: ['Blanco', 'Beige', 'Gris', 'Ivory'] },
   { nombre: 'Blackout Córdoba', colores: ['Nieve', 'Marfil', 'Centeno', 'Camel', 'Tostado', 'Grafito', 'Plomo'] },
@@ -33,7 +33,21 @@ const TELAS_CORTINA = [
 ];
 
 /** Una copia propia del catálogo, para que tocar un tipo no toque el otro. */
-const telasCortina = () => TELAS_CORTINA.map((t) => ({ ...t, colores: [...t.colores] }));
+export const telasCortina = () => TELAS_CORTINA.map((t) => ({ ...t, colores: [...t.colores] }));
+
+/**
+ * Telas que usan el sistema "básico" (el más económico) en roller y vertical:
+ * los blackouts y las Sun Screen 5%, que es justo lo que dice el nombre del
+ * sistema de verticales. El resto usa el de "demás telas".
+ * Los dos primeros son los nombres que tenía el catálogo anterior: quedan en
+ * la lista para que un renglón cotizado entonces siga saliendo con el mismo
+ * sistema con el que salió ese día.
+ */
+export const TELAS_SISTEMA_BASICO = [
+  'Blackout', 'Sunscreen 5%',
+  'Black Out Vinílico EEUU', 'Black Out Vinílico ECO', 'Blackout Córdoba',
+  'Sun Screen 5%', 'Sun Screen 5% Bicolor', 'Sun Screen 5% ECO',
+];
 
 export const TIPOS = {
   roller: {
@@ -297,17 +311,7 @@ export function configVacia() {
     // se pueden renombrar o borrar igual, pero Ajustes avisa antes de borrarlos.
     catalogoSistemas: Object.entries(SISTEMAS).map(([id, def]) => sistemaNormalizado({ id, ...def, protegido: true })),
     sistemas: Object.fromEntries(Object.keys(SISTEMAS).map((id) => [id, 0])),
-    // Telas que usan el sistema "básico" (el más económico) en roller y
-    // vertical: los blackouts y las Sun Screen 5%, que es justo lo que dice el
-    // nombre del sistema de verticales. El resto usa el de "demás telas".
-    // Los dos primeros son los nombres que tenía el catálogo anterior: quedan
-    // en la lista para que un renglón cotizado entonces siga saliendo con el
-    // mismo sistema que salió ese día.
-    telasSistemaBasico: [
-      'Blackout', 'Sunscreen 5%',
-      'Black Out Vinílico EEUU', 'Black Out Vinílico ECO', 'Blackout Córdoba',
-      'Sun Screen 5%', 'Sun Screen 5% Bicolor', 'Sun Screen 5% ECO',
-    ],
+    telasSistemaBasico: [...TELAS_SISTEMA_BASICO],
     // Adicionales: catálogo de productos simples (nombre + precio por unidad)
     // que se carga enteramente desde Ajustes. El precio es de contado.
     // Ver calcularItemAdicional.
