@@ -35,20 +35,6 @@ export const TELAS_CORTINA = [
 /** Una copia propia del catálogo, para que tocar un tipo no toque el otro. */
 export const telasCortina = () => TELAS_CORTINA.map((t) => ({ ...t, colores: [...t.colores] }));
 
-/**
- * Telas que usan el sistema "básico" (el más económico) en roller y vertical:
- * los blackouts y las Sun Screen 5%, que es justo lo que dice el nombre del
- * sistema de verticales. El resto usa el de "demás telas".
- * Los dos primeros son los nombres que tenía el catálogo anterior: quedan en
- * la lista para que un renglón cotizado entonces siga saliendo con el mismo
- * sistema con el que salió ese día.
- */
-export const TELAS_SISTEMA_BASICO = [
-  'Blackout', 'Sunscreen 5%',
-  'Black Out Vinílico EEUU', 'Black Out Vinílico ECO', 'Blackout Córdoba',
-  'Sun Screen 5%', 'Sun Screen 5% Bicolor', 'Sun Screen 5% ECO',
-];
-
 export const TIPOS = {
   roller: {
     nombre: 'Roller',
@@ -82,8 +68,7 @@ export const SISTEMAS = {
   roller_quantum_28: { nombre: 'QUANTUM 28mm', tipo: 'roller', colores: ['Blanco', 'Gris', 'Negro'] },
   roller_quantum_38: { nombre: 'QUANTUM 38mm', tipo: 'roller', colores: ['Blanco', 'Gris', 'Negro'] },
   roller_quantum_45: { nombre: 'QUANTUM 45mm', tipo: 'roller', colores: ['Blanco', 'Negro'] },
-  vertical_basico: { nombre: 'Vertical · Blackout / Sunscreen 5%', tipo: 'vertical', colores: [] },
-  vertical_demas: { nombre: 'Vertical · Demás telas', tipo: 'vertical', colores: [] },
+  vertical: { nombre: 'Sistema Vertical', tipo: 'vertical', colores: [] },
   zebra: { nombre: 'Sistema Zebra', tipo: 'zebra', colores: [] },
 };
 
@@ -314,7 +299,6 @@ export function configVacia() {
     // se pueden renombrar o borrar igual, pero Ajustes avisa antes de borrarlos.
     catalogoSistemas: Object.entries(SISTEMAS).map(([id, def]) => sistemaNormalizado({ id, ...def, protegido: true })),
     sistemas: Object.fromEntries(Object.keys(SISTEMAS).map((id) => [id, 0])),
-    telasSistemaBasico: [...TELAS_SISTEMA_BASICO],
     // Adicionales: catálogo de productos simples (nombre + precio por unidad)
     // que se carga enteramente desde Ajustes. El precio es de contado.
     // Ver calcularItemAdicional.
@@ -613,20 +597,22 @@ export function costoInstaladorItem(item, config, { cortinasTotales = 1 } = {}) 
 }
 
 /**
- * Tipos cuyo sistema se elige según la tela: los que están en
- * `telasSistemaBasico` usan el económico y el resto el de "demás telas".
- * Zebra tiene un solo sistema, así que no se divide.
+ * Antes, en roller el sistema lo decidía la tela: las de esta lista usaban el
+ * "básico" y el resto el de "demás telas". Esa mecánica se sacó —ahora el
+ * sistema se elige a mano y cualquiera va con cualquier tela—, pero los
+ * renglones cotizados entonces no guardaron cuál usaron. Esta lista congelada
+ * es sólo para ellos: no se edita en ningún lado y no entra en nada nuevo.
  */
-export function usaSistemaBasico(tipo) {
-  return tipo === 'roller' || tipo === 'vertical';
-}
+const TELAS_ROLLER_BASICO_VIEJAS = ['Blackout', 'Sunscreen 5%'];
 
-/** Sistema que corresponde automáticamente a un tipo + tela. */
-export function sistemaAuto(tipo, tela, config) {
-  if (!usaSistemaBasico(tipo)) return tipo;
-  const basicas = config.telasSistemaBasico || [];
-  const sufijo = basicas.includes(tela) ? 'basico' : 'demas';
-  return `${tipo}_${sufijo}`;
+/**
+ * El sistema de un renglón que no tiene uno guardado. En los tipos de una sola
+ * opción (verticales, zebra) es el del tipo. En roller significa que el
+ * renglón es viejo, de cuando lo decidía la tela: ver arriba.
+ */
+export function sistemaAuto(tipo, tela) {
+  if (tipo === 'roller') return TELAS_ROLLER_BASICO_VIEJAS.includes(tela) ? 'roller_basico' : 'roller_demas';
+  return tipo;
 }
 
 /**

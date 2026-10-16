@@ -13,13 +13,16 @@
 // en el código (el repo es público). Se cargan desde Ajustes → Respaldo →
 // Importar lista de precios, o a mano en Ajustes.
 
-import { TELAS_CORTINA, TELAS_SISTEMA_BASICO, SISTEMAS, telaNormalizada, sistemaNormalizado } from './calc.js';
+import { TELAS_CORTINA, SISTEMAS, telaNormalizada, sistemaNormalizado } from './calc.js';
 
 /** Las telas que traía el catálogo antes de tener los nombres del proveedor. */
 const TELAS_VIEJAS = ['Blackout', 'Sunscreen 5%', 'Sunscreen 1%', 'South Beach', 'Shangtung', 'Córdoba', 'Blackout decorativo'];
 
 /** Los dos sistemas de roller de antes: ahora el sistema se elige a mano. */
 const ROLLER_VIEJOS = ['roller_basico', 'roller_demas'];
+
+/** Los dos de vertical de antes: ahora hay uno solo para todas las telas. */
+const VERTICALES_VIEJOS = ['vertical_basico', 'vertical_demas'];
 
 const copiaTela = (t) => ({ nombre: t.nombre, colores: [...t.colores] });
 
@@ -69,11 +72,31 @@ const MIGRACIONES = [
       return {
         catalogoTelas,
         catalogoSistemas: sistemasMigrados(config.catalogoSistemas),
-        // Las telas del sistema básico se suman a las que ya estaban: las de
-        // antes se dejan en paz para que un renglón viejo siga saliendo con el
-        // sistema con el que se cotizó.
-        telasSistemaBasico: [...new Set([...(config.telasSistemaBasico || []), ...TELAS_SISTEMA_BASICO])],
       };
+    },
+  },
+  {
+    // Un solo sistema para todas las bandas verticales. Antes eran dos y los
+    // repartía la tela ("básico" para blackouts y sunscreen 5%, "demás telas"
+    // para el resto); esa mecánica ya no existe.
+    clave: 'vertical-sistema-unico-2026-10',
+    cambios(config) {
+      const sistemas = { ...(config.sistemas || {}) };
+      // El costo arranca con el más alto de los dos que había, para no cotizar
+      // ninguna tela por debajo de lo que salía ayer. Se corrige en Ajustes.
+      const deAntes = Math.max(...VERTICALES_VIEJOS.map((id) => Number(sistemas[id]) || 0));
+      sistemas.vertical = Number(sistemas.vertical) || deAntes;
+      VERTICALES_VIEJOS.forEach((id) => { delete sistemas[id]; });
+
+      const catalogo = (config.catalogoSistemas || [])
+        .map(sistemaNormalizado)
+        .filter((s) => s.id && !VERTICALES_VIEJOS.includes(s.id));
+      if (!catalogo.some((s) => s.id === 'vertical')) {
+        catalogo.push(sistemaNormalizado({ id: 'vertical', ...SISTEMAS.vertical, protegido: true }));
+      }
+
+      // La lista de telas "del sistema básico" no la mira nadie más.
+      return { sistemas, catalogoSistemas: catalogo, telasSistemaBasico: undefined };
     },
   },
 ];

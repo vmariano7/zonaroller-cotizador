@@ -2,7 +2,7 @@
 // sincronización con la nube y respaldos.
 
 import { estado, guardarConfig, cerrarSesion, sincronizar, exportarRespaldo, importarRespaldo } from '../store.js';
-import { TIPOS, CATEGORIA, sistemasDeConfig, usaSistemaBasico, telasDeTipo, precioBaseTela, eligeSistema } from '../calc.js';
+import { TIPOS, CATEGORIA, sistemasDeConfig, telasDeTipo, precioBaseTela } from '../calc.js';
 import { esc, aviso, confirmar, descargarArchivo, fecha, plata, modal } from '../ui.js';
 import { plantillaDe, CLAVES } from '../mensaje.js';
 import { tienePin, definirPin } from '../candado.js';
@@ -122,7 +122,7 @@ export function render(contenedor) {
         <div style="display:flex;justify-content:flex-end;margin-bottom:.4rem">
           <button class="btn btn--chico btn--fantasma" data-gestionar-sistemas style="font-size:.7rem;padding:.3rem .6rem">Agregar / renombrar / borrar</button>
         </div>
-        ${sistemasDeConfig(c).map(({ id: clave, nombre }) => `
+        ${sistemasDeConfig(c).filter((sis) => !sis.oculto).map(({ id: clave, nombre }) => `
           <div class="campo" style="display:flex;align-items:center;gap:.6rem">
             <label style="flex:1;margin:0;font-weight:500">${esc(nombre)}</label>
             <div class="con-prefijo" style="width:140px"><span>$</span>
@@ -609,11 +609,10 @@ export function render(contenedor) {
 }
 
 /**
- * Carga una lista de precios: telas y sistemas con sus colores y sus valores,
- * y de paso qué telas usan el sistema básico. Se mezcla con lo que ya está
- * cargado —lo que no viene en el archivo queda como está, así los presupuestos
- * viejos siguen encontrando sus telas y sus sistemas— y no toca ninguna otra
- * parte de la configuración.
+ * Carga una lista de precios: telas y sistemas con sus colores y sus valores.
+ * Se mezcla con lo que ya está cargado —lo que no viene en el archivo queda
+ * como está, así los presupuestos viejos siguen encontrando sus telas y sus
+ * sistemas— y no toca ninguna otra parte de la configuración.
  */
 async function importarListaDePrecios(datos) {
   const c = estado.config;
@@ -640,12 +639,6 @@ async function importarListaDePrecios(datos) {
     cambios.sistemas = { ...c.sistemas, ...datos.sistemas };
     cuenta.sistemas = Object.keys(datos.sistemas).length;
   }
-  // Las telas del sistema básico se suman a las que ya estaban tildadas: las de
-  // antes se dejan en paz para que un renglón viejo siga saliendo con el mismo
-  // sistema con el que se cotizó.
-  if (Array.isArray(datos.telasSistemaBasico)) {
-    cambios.telasSistemaBasico = [...new Set([...(c.telasSistemaBasico || []), ...datos.telasSistemaBasico])];
-  }
   if (!Object.keys(cambios).length) throw new Error('El archivo no trae telas ni sistemas.');
 
   await guardarConfig(cambios);
@@ -654,35 +647,25 @@ async function importarListaDePrecios(datos) {
 
 /**
  * Agregar, renombrar o borrar telas de un tipo (roller, vertical o zebra).
- * Roller y vertical llevan además el tilde de "sistema básico": las telas
- * tildadas usan el sistema económico (ver `telasSistemaBasico` en calc.js);
- * las demás usan el sistema "demás telas". Zebra tiene un solo sistema, así
- * que ahí no hace falta elegir.
+ * La tela no decide nada del sistema: en roller se elige a mano al cotizar y
+ * en verticales y zebra hay uno solo para todas.
  */
 function dialogoTelas(tipo, alGuardar) {
   const nombreTipo = TIPOS[tipo].nombre;
   const originales = telasDeTipo(tipo, estado.config);
-  const nombresOriginales = originales.map((t) => t.nombre);
   const precios = estado.config.telas?.[tipo] || {};
-  const basicas = new Set(estado.config.telasSistemaBasico || []);
-  // El tilde de "sistema básico" sólo tiene sentido donde el sistema lo decide
-  // la tela: en los tipos que lo eligen a mano al cotizar, no.
-  const conSistema = usaSistemaBasico(tipo) && !eligeSistema(tipo);
-
   let lista = originales.map((t) => ({
     nombre: t.nombre,
     colores: t.colores.join(', '),
     precio: precioBaseTela(tipo, t.nombre, estado.config),
-    basico: basicas.has(t.nombre),
   }));
-  const filaVacia = () => ({ nombre: '', colores: '', precio: 0, basico: false });
+  const filaVacia = () => ({ nombre: '', colores: '', precio: 0 });
   if (!lista.length) lista.push(filaVacia());
 
   const m = modal(`Telas de ${nombreTipo}`, `
     <div class="mini mb-16">Agregá, renombrá o borrá telas de ${nombreTipo.toLowerCase()}. Los colores van
     separados por coma y se eligen al cotizar; si alguno vale distinto, su precio se carga en Ajustes,
-    debajo de la tela.
-    ${conSistema ? ' Tildá <strong>sistema básico</strong> para las que usan el sistema más económico (por defecto Blackout y Sunscreen 5%); el resto usa "demás telas".' : ''}</div>
+    debajo de la tela.</div>
     <div data-filas></div>
     <button class="btn btn--chico mt-16" data-agregar style="width:100%">+ Agregar tela</button>
     <div class="fila-botones fila-botones--fin mt-16">
@@ -700,11 +683,6 @@ function dialogoTelas(tipo, alGuardar) {
           <div class="con-prefijo" style="width:130px"><span>$</span>
             <input type="number" inputmode="decimal" min="0" step="1" data-precio="${i}" value="${t.precio}">
           </div>
-          ${conSistema ? `
-          <label class="switch" style="margin:0" title="Usa el sistema básico">
-            <input type="checkbox" data-basico="${i}"${t.basico ? ' checked' : ''}>
-            <span class="switch__pista"></span>
-          </label>` : ''}
           <button class="btn-icono" data-quitar="${i}" title="Quitar">&#10005;</button>
         </div>
         <input data-colores="${i}" placeholder="Colores, separados por coma" value="${esc(t.colores)}" style="margin-top:.35rem">
@@ -719,9 +697,6 @@ function dialogoTelas(tipo, alGuardar) {
     );
     cajaFilas.querySelectorAll('[data-precio]').forEach((inp) =>
       inp.addEventListener('input', () => { lista[Number(inp.dataset.precio)].precio = Number(inp.value) || 0; })
-    );
-    cajaFilas.querySelectorAll('[data-basico]').forEach((inp) =>
-      inp.addEventListener('change', () => { lista[Number(inp.dataset.basico)].basico = inp.checked; })
     );
     cajaFilas.querySelectorAll('[data-quitar]').forEach((b) =>
       b.addEventListener('click', () => {
@@ -764,14 +739,6 @@ function dialogoTelas(tipo, alGuardar) {
       catalogoTelas: { ...estado.config.catalogoTelas, [tipo]: catalogoNuevo },
       telas: { ...estado.config.telas, [tipo]: preciosNuevos },
     };
-    if (conSistema) {
-      // Las telas que no pertenecen a este tipo (por ejemplo, si el nombre
-      // también existe en el otro tipo) quedan como estaban; acá solo se
-      // actualiza la parte de la lista que corresponde a las telas editadas.
-      const ajenas = (estado.config.telasSistemaBasico || []).filter((n) => !nombresOriginales.includes(n));
-      const propias = limpia.filter((t) => t.basico).map((t) => t.nombre);
-      cambios.telasSistemaBasico = [...ajenas, ...propias];
-    }
     await guardarConfig(cambios);
     m.cerrar();
     aviso('Telas actualizadas.');
