@@ -159,12 +159,11 @@ export const ESTADOS_PEDIDO = {
 };
 
 /**
- * La medida de un renglón, en texto: las placas se cotizan por superficie
+ * La medida de un renglón, en texto: los adicionales no tienen medida
  * (un solo casillero de m²) y las cortinas por ancho × alto.
  */
 export function medidaTexto(item, calc) {
   if (item?.tipo === 'adicional') return '—';
-  if (item?.tipo === 'placa') return `${num(calc.m2)} m²`;
   return `${num(calc.anchoM)} × ${num(calc.altoM)} m`;
 }
 

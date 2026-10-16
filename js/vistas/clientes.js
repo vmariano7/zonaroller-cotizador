@@ -41,7 +41,7 @@ export function listarClientes() {
         comprado: 0,
         debe: 0,
         // Cuánto le vendiste de cada cosa. Va separado por categoría: un
-        // pedido de placas no son cortinas.
+        // pedido de adicionales no son cortinas.
         unidades: {},
         ultima: '',
       });
@@ -174,8 +174,8 @@ export function renderDetalle(contenedor, params) {
   const pagado = activos.reduce((a, p) => a + cobrado(p), 0);
   const tel = soloDigitos(c.telefono);
 
-  // Qué le gusta comprar: la tela si es cortina, el producto si es placa o
-  // adicional. Antes se miraba sólo la tela, así que una placa entraba como
+  // Qué le gusta comprar: la tela si es cortina, el producto si es adicional.
+  // Antes se miraba sólo la tela, así que un adicional entraba como
   // "undefined".
   const materiales = {};
   activos.forEach((p) => {

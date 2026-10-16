@@ -2,7 +2,7 @@
 // El orden importa: primero las cortinas (que es lo que se cotiza a diario) y
 // los datos del cliente arriba, plegados, para que no tapen lo principal.
 
-import { TIPOS, ARMADO, ARMADO_POR_TIPO, itemVacio, calcularItem, calcularTotales, hayPreciosCargados, descripcionItem, detallesTecnicos, admiteMotor, telasDeTipo, superficiePlaca, catalogoDe, sistemasElegibles, sistemaAuto, categoriaItem } from '../calc.js';
+import { TIPOS, ARMADO, ARMADO_POR_TIPO, itemVacio, calcularItem, calcularTotales, hayPreciosCargados, descripcionItem, detallesTecnicos, admiteMotor, telasDeTipo, catalogoDe, sistemasElegibles, sistemaAuto, categoriaItem } from '../calc.js';
 import { estado } from '../store.js';
 import { el, esc, plata, num, leerNumero, hoyISO, aviso } from '../ui.js';
 import { armarMensaje, datosContado, copiar } from '../mensaje.js';
@@ -108,11 +108,11 @@ export function montarEditor(contenedor, doc, {
   // no terminó de construir su propio estado.
   let montado = false;
   const avisar = () => { if (montado) alCambiar?.(modelo); };
-  // Placas y adicionales se arman con un catálogo de productos; las cortinas,
-  // con los costos de telas y sistemas. Cambia el aviso de "faltan precios".
-  const esCatalogo = tipoInicial === 'placa' || tipoInicial === 'adicional';
-  // De qué es este presupuesto. A uno de cortinas o de placas se le pueden
-  // enganchar adicionales, para cotizar las dos cosas en el mismo papel.
+  // Los adicionales se arman con un catálogo de productos; las cortinas, con
+  // los costos de telas y sistemas. Cambia el aviso de "faltan precios".
+  const esCatalogo = tipoInicial === 'adicional';
+  // De qué es este presupuesto. A uno de cortinas se le pueden enganchar
+  // adicionales, para cotizar las dos cosas en el mismo papel.
   const categoriaEditor = categoriaItem({ tipo: tipoInicial });
   const admiteAdicionales = categoriaEditor !== 'adicional';
 
@@ -295,15 +295,10 @@ export function montarEditor(contenedor, doc, {
       const categoria = agregaAdicional ? 'adicional' : categoriaEditor;
       const ultimo = [...modelo.items].reverse().find((it) => categoriaItem(it) === categoria);
       const nuevo = itemVacio(ultimo?.tipo || (agregaAdicional ? 'adicional' : tipoInicial));
-      if (ultimo && (nuevo.tipo === 'placa' || nuevo.tipo === 'adicional')) {
-        // Lo más común es seguir cargando el mismo producto y las mismas
-        // opciones (colocación/envío) que el renglón anterior.
+      if (ultimo && nuevo.tipo === 'adicional') {
+        // Lo más común es seguir cargando el mismo producto que el anterior.
         nuevo.productoId = ultimo.productoId;
         nuevo.producto = ultimo.producto;
-        if (nuevo.tipo === 'placa') {
-          nuevo.colocacion = ultimo.colocacion;
-          nuevo.envio = ultimo.envio;
-        }
       } else if (ultimo) {
         nuevo.tela = ultimo.tela;
         // El armado se repite entre cortinas de la misma casa casi siempre.
@@ -325,7 +320,7 @@ export function montarEditor(contenedor, doc, {
   }
 
   function nodoItem(item, indice) {
-    if (item.tipo === 'placa' || item.tipo === 'adicional') return nodoItemProducto(item, indice);
+    if (item.tipo === 'adicional') return nodoItemProducto(item, indice);
 
     const config = estado.config;
     const esTelaTradicional = item.tipo === 'tela_tradicional';
@@ -603,49 +598,34 @@ export function montarEditor(contenedor, doc, {
   }
 
   /**
-   * Placa o adicional: producto del catálogo (Ajustes) y cantidad. La placa
-   * suma superficie en m² y los tildes de colocación y envío; el adicional se
-   * cobra por unidad y no lleva nada de eso. Ninguno de los dos tiene
+   * Adicional: producto del catálogo (Ajustes) y cantidad, nada más. No tiene
    * tipo/tela/sistema/armado: eso es exclusivo de las cortinas.
    */
   function nodoItemProducto(item, indice) {
     const config = estado.config;
-    const esPlaca = item.tipo === 'placa';
     const catalogo = catalogoDe(item.tipo, config);
     if (!catalogo.some((p) => p.id === item.productoId)) {
       const primero = catalogo[0];
       item.productoId = primero?.id ?? null;
       item.producto = primero?.nombre ?? '';
     }
-    // Antes la placa se cargaba con ancho y alto. Si el renglón viene así, lo
-    // pasamos a superficie una sola vez, al abrirlo.
-    if (esPlaca && item.m2 == null && (item.anchoM != null || item.altoM != null)) {
-      item.m2 = superficiePlaca(item) || null;
-      delete item.anchoM;
-      delete item.altoM;
-    }
 
     const nodo = el(`
       <div class="cortina" data-id="${item.id}">
         <div class="cortina__cab">
           <span class="cortina__n">${String(indice + 1).padStart(2, '0')}</span>
-          <span class="chip chip--gris" style="font-size:.7rem">${esPlaca ? 'Placa' : 'Adicional'}</span>
+          <span class="chip chip--gris" style="font-size:.7rem">Adicional</span>
           <input data-campo="ambiente" class="cortina__ambiente" placeholder="Ambiente (ej. Living, Dormitorio)" value="${esc(item.ambiente)}">
-          <button class="btn-icono" data-quitar title="Quitar ${esPlaca ? 'placa' : 'adicional'}">&#10005;</button>
+          <button class="btn-icono" data-quitar title="Quitar adicional">&#10005;</button>
         </div>
 
-        <div class="campos campos--${esPlaca ? '3' : '2'} mt-16">
+        <div class="campos campos--2 mt-16">
           <div>
             <label>Producto</label>
             <select data-campo="productoId">
-              ${catalogo.map((p) => `<option value="${esc(p.id)}"${p.id === item.productoId ? ' selected' : ''}>${esc(p.nombre)} — ${plata(p.precio)}${esPlaca ? '/m²' : ' c/u'}</option>`).join('')}
+              ${catalogo.map((p) => `<option value="${esc(p.id)}"${p.id === item.productoId ? ' selected' : ''}>${esc(p.nombre)} — ${plata(p.precio)} c/u</option>`).join('')}
             </select>
           </div>
-          ${esPlaca ? `
-          <div>
-            <label>Superficie</label>
-            <div class="con-sufijo"><input data-medida="m2" type="text" inputmode="decimal" placeholder="0" value="${mostrarMedida(item.m2)}"><span>m²</span></div>
-          </div>` : ''}
           <div>
             <label>Cantidad</label>
             <input data-campo="cantidad" type="number" inputmode="numeric" min="1" step="1" value="${item.cantidad || 1}">
@@ -658,21 +638,6 @@ export function montarEditor(contenedor, doc, {
             <label>Detalle</label>
             <input data-campo="detalle" placeholder="Cualquier otra aclaración…" value="${esc(item.detalle || '')}">
           </div>
-          ${esPlaca ? `
-          <div class="check mt-16">
-            <label class="switch">
-              <input type="checkbox" data-campo="colocacion"${item.colocacion ? ' checked' : ''}>
-              <span class="switch__pista"></span>
-            </label>
-            <span>Con colocación <span class="mini">(${plata(Number(config.placaColocacionM2) || 0)}/m², a costo de contado)</span></span>
-          </div>
-          <div class="check mt-16">
-            <label class="switch">
-              <input type="checkbox" data-campo="envio"${item.envio ? ' checked' : ''}>
-              <span class="switch__pista"></span>
-            </label>
-            <span>Con envío <span class="mini">(${plata(Number(config.placaEnvioFijo) || 0)} fijo, a costo de contado)</span></span>
-          </div>` : ''}
         </details>
 
         <div class="cortina__resumen" data-resumen></div>
@@ -723,12 +688,8 @@ export function montarEditor(contenedor, doc, {
 
   function pintarResumenProducto(nodo, item) {
     const c = calcularItem(item, estado.config, {});
-    const partes = item.tipo === 'placa'
-      ? [`${num(c.m2)} m²`]
-      : [`${c.cantidad} × ${plata(c.precioUnitario)}`];
+    const partes = [`${c.cantidad} × ${plata(c.precioUnitario)}`];
     if (c.incrementoPct) partes.push(`+${num(c.incrementoPct, 0)}%`);
-    if (item.colocacion) partes.push(`colocación ${plata(c.costoColocacion / c.cantidad)} <span class="mini">(al costo)</span>`);
-    if (item.envio) partes.push(`envío ${plata(c.costoEnvio / c.cantidad)} <span class="mini">(al costo)</span>`);
     const sinPrecio = !item.productoId || c.precioTela === 0;
 
     const armado = nodo.querySelector('[data-armado]');
@@ -797,9 +758,8 @@ export function montarEditor(contenedor, doc, {
 
   if (esCatalogo) {
     if (!catalogoDe(tipoInicial, estado.config).length) {
-      const que = tipoInicial === 'placa' ? 'placas' : 'adicionales';
       contenedor.prepend(
-        el(`<div class="banner banner--aviso"><div>Todavía no cargaste productos de ${que}. Andá a <strong>Ajustes</strong> para cargarlos.</div></div>`)
+        el('<div class="banner banner--aviso"><div>Todavía no cargaste adicionales. Andá a <strong>Ajustes</strong> para cargarlos.</div></div>')
       );
     }
   } else if (!hayPreciosCargados(estado.config)) {

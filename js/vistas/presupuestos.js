@@ -165,7 +165,7 @@ export function renderDetalle(contenedor, params) {
               <tr>
                 <td>${esc(item.ambiente || '—')}${item.detalle ? `<div class="mini">${esc(item.detalle)}</div>` : ''}</td>
                 <td>${esc(NOMBRE_TIPO[item.tipo] || item.tipo)}<div class="mini">${esc(descripcionItem(item) || item.tela)}</div></td>
-                <td class="num">${item.tipo === 'placa' ? '—' : medidaTexto(item, calc)}</td>
+                <td class="num">${medidaTexto(item, calc)}</td>
                 <td class="num">${num(calc.m2)}</td>
                 <td class="num">${calc.cantidad}</td>
                 <td class="num">${plata(calc.precioUnitario)}</td>

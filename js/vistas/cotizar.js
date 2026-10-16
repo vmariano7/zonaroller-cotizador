@@ -1,12 +1,12 @@
 // Pantalla de cotización: crea o edita un presupuesto.
 //
 // Al entrar sin nada más (sin id de presupuesto ni categoría elegida) se
-// muestra primero un selector de categoría: Cortinas, Placas o Adicionales.
+// muestra primero un selector de categoría: Cortinas o Adicionales.
 // Cortinas habilita el editor de siempre, sin ningún cambio: roller, vertical,
 // zebra y tela tradicional siguen viviendo adentro, tal cual estaban.
 // Las tres categorías pasan por el mismo editor, así que las tres se guardan,
 // se convierten en pedido y salen en PDF igual. Lo único que cambia es el
-// renglón: placas y adicionales usan producto del catálogo en vez de
+// renglón: los adicionales usan producto del catálogo en vez de
 // tipo/tela/sistema — ver nodoItemProducto en editor.js.
 
 import { montarEditor, docVacio, CLIENTE_POR_DEFECTO } from './editor.js';
@@ -28,16 +28,6 @@ const CATEGORIAS = [
       <path d="M7.5 18v2.5M16.5 18v2.5" opacity=".45"/></svg>`,
   },
   {
-    clave: 'placas',
-    nombre: 'Placas',
-    desc: 'Por m², con colocación y envío',
-    icono: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round">
-      <rect x="3.5" y="3.5" width="7" height="7" rx="1.2"/>
-      <rect x="13.5" y="3.5" width="7" height="7" rx="1.2"/>
-      <rect x="3.5" y="13.5" width="7" height="7" rx="1.2"/>
-      <rect x="13.5" y="13.5" width="7" height="7" rx="1.2"/></svg>`,
-  },
-  {
     clave: 'adicionales',
     nombre: 'Adicionales',
     desc: 'Productos sueltos, por unidad',
@@ -48,7 +38,7 @@ const CATEGORIAS = [
 ];
 
 /** De la categoría que viene en la URL a la clave que usa el resto de la app. */
-const CLAVE_CATEGORIA = { cortinas: 'cortina', placas: 'placa', adicionales: 'adicional' };
+const CLAVE_CATEGORIA = { cortinas: 'cortina', adicionales: 'adicional' };
 
 export function render(contenedor, params = {}) {
   if (!params.id && !params.categoria) return renderElegirCategoria(contenedor);

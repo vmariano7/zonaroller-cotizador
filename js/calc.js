@@ -105,7 +105,6 @@ export function sistemasDeConfig(config) {
  */
 export const NOMBRE_TIPO = {
   ...Object.fromEntries(Object.entries(TIPOS).map(([clave, def]) => [clave, def.nombre])),
-  placa: 'Placa',
   adicional: 'Adicional',
 };
 
@@ -192,24 +191,16 @@ export function configVacia() {
     },
     // Telas que usan el sistema "básico" (más económico) en roller y vertical.
     telasSistemaBasico: ['Blackout', 'Sunscreen 5%'],
-    // Placas y adicionales: catálogos de productos simples (nombre + precio)
-    // que se cargan enteramente desde Ajustes. El precio es de contado: la
-    // placa va por m² y el adicional por unidad. Ver calcularItemPlaca y
-    // calcularItemAdicional.
-    placas: [],
+    // Adicionales: catálogo de productos simples (nombre + precio por unidad)
+    // que se carga enteramente desde Ajustes. El precio es de contado.
+    // Ver calcularItemAdicional.
     adicionales: [],
-    // Colocación y envío de placas: van al costo de contado igual que el
-    // precio del producto (ver calcularItemPlaca), así que al pasarlo a lista
-    // se les aplica el mismo descuento que a todo lo demás.
-    placaColocacionM2: 0,
-    placaEnvioFijo: 0,
     incrementos: {
       roller: { activo: true, valor: 0 },
       vertical: { activo: true, valor: 0 },
       panel_oriental: { activo: true, valor: 0 },
       zebra: { activo: true, valor: 0 },
       tela_tradicional: { activo: true, valor: 0 },
-      placa: { activo: true, valor: 0 },
       adicional: { activo: true, valor: 0 },
     },
     // Lo que te sale el instalador. Se traslada al precio final de la cortina:
@@ -257,7 +248,7 @@ export function configVacia() {
 }
 
 export function itemVacio(tipo = 'roller') {
-  if (tipo === 'placa' || tipo === 'adicional') {
+  if (tipo === 'adicional') {
     return {
       id: crypto.randomUUID(),
       ambiente: '',
@@ -266,9 +257,6 @@ export function itemVacio(tipo = 'roller') {
       producto: '', // nombre copiado al elegir el producto: si lo borrás o renombrás después, el renglón viejo lo sigue mostrando igual
       cantidad: 1,
       detalle: '',
-      // La placa se cotiza por superficie y puede llevar colocación y envío;
-      // el adicional se cobra por unidad y no lleva nada de eso.
-      ...(tipo === 'placa' ? { m2: null, colocacion: false, envio: false } : {}),
     };
   }
   if (tipo === 'tela_tradicional') {
@@ -314,9 +302,6 @@ export function itemVacio(tipo = 'roller') {
  * Sirve tanto para el resumen en pantalla como para la orden de trabajo.
  */
 export function detallesTecnicos(item) {
-  if (item.tipo === 'placa') {
-    return [item.colocacion ? 'Con colocación' : null, item.envio ? 'Con envío' : null].filter(Boolean);
-  }
   if (item.tipo === 'tela_tradicional') {
     const paños = Number(item.cantPaños) || 1;
     return [`${paños} paño${paños === 1 ? '' : 's'}`, item.pliegue, item.recogimiento].filter(Boolean);
@@ -332,32 +317,29 @@ export function detallesTecnicos(item) {
 
 /**
  * De qué es un presupuesto o pedido, mirando sus renglones. Se elige al
- * crearlo, pero un presupuesto de cortinas (o de placas) puede llevar
- * adicionales enganchados; manda lo principal, que es lo que decide qué
- * editor se abre y qué mensaje se manda.
+ * crearlo, pero un presupuesto de cortinas puede llevar adicionales
+ * enganchados; manda lo principal, que es lo que decide qué editor se abre y
+ * qué mensaje se manda.
  */
 export function categoriaDoc(doc) {
   const cats = new Set((doc?.items || []).filter((it) => it?.tipo).map(categoriaItem));
   if (cats.has('cortina')) return 'cortina';
-  if (cats.has('placa')) return 'placa';
   if (cats.has('adicional')) return 'adicional';
   return 'cortina';
 }
 
-/** De qué categoría es un renglón suelto: cortina, placa o adicional. */
+/** De qué categoría es un renglón suelto: cortina o adicional. */
 export function categoriaItem(item) {
-  const tipo = item?.tipo;
-  return tipo === 'placa' || tipo === 'adicional' ? tipo : 'cortina';
+  return item?.tipo === 'adicional' ? 'adicional' : 'cortina';
 }
 
 /** Cómo se llama cada categoría en pantalla. La clave sale de categoriaDoc. */
 export const CATEGORIA = {
   cortina: { tipoItem: 'roller', singular: 'cortina', plural: 'cortinas', conArticulo: 'las cortinas', titulo: 'Cortinas', agregar: '+ Agregar otra cortina' },
-  placa: { tipoItem: 'placa', singular: 'placa', plural: 'placas', conArticulo: 'las placas', titulo: 'Placas', agregar: '+ Agregar otra placa' },
   adicional: { tipoItem: 'adicional', singular: 'adicional', plural: 'adicionales', conArticulo: 'los adicionales', titulo: 'Adicionales', agregar: '+ Agregar otro adicional' },
 };
 
-/** "1 cortina", "3 placas", "4 adicionales". */
+/** "1 cortina", "4 adicionales". */
 export function contarItems(cantidad, categoria) {
   const cat = CATEGORIA[categoria] || CATEGORIA.cortina;
   const n = Number(cantidad) || 0;
@@ -366,8 +348,8 @@ export function contarItems(cantidad, categoria) {
 
 /**
  * Con qué está hecho el renglón, para los rankings: la tela si es una cortina,
- * el producto si es una placa o un adicional. Sin esto, una placa entra a los
- * rankings como "undefined": no tiene tela.
+ * el producto si es un adicional. Sin esto, un adicional entra a los rankings
+ * como "undefined": no tiene tela.
  */
 export function materialItem(item) {
   if (categoriaItem(item) === 'cortina') return item?.tela || '';
@@ -375,8 +357,8 @@ export function materialItem(item) {
 }
 
 /**
- * Cuántas unidades hay de cada categoría, en texto: "5 cortinas · 2 placas".
- * Recibe un objeto { cortina, placa, adicional } y saltea las que están en 0.
+ * Cuántas unidades hay de cada categoría, en texto: "5 cortinas · 2 adicionales".
+ * Recibe un objeto { cortina, adicional } y saltea las que están en 0.
  */
 export function frasearUnidades(unidades) {
   const partes = Object.keys(CATEGORIA)
@@ -385,7 +367,7 @@ export function frasearUnidades(unidades) {
   return partes.length ? partes.join(' · ') : contarItems(0, 'cortina');
 }
 
-/** Cuántas unidades hay de cada categoría entre estos renglones: { cortina, placa, adicional }. */
+/** Cuántas unidades hay de cada categoría entre estos renglones: { cortina, adicional }. */
 export function unidadesDeItems(items) {
   const unidades = {};
   (items || []).forEach((it) => {
@@ -398,7 +380,7 @@ export function unidadesDeItems(items) {
 /**
  * Lo mismo sumando documentos enteros. Se cuentan los renglones uno por uno:
  * un presupuesto de cortinas puede traer adicionales, y cada cosa va a su
- * categoría. Sin esto, un pedido de placas figuraba como si fueran cortinas.
+ * categoría. Sin esto, un pedido de adicionales figuraba como si fueran cortinas.
  */
 export function unidadesDeDocs(docs) {
   const unidades = {};
@@ -413,19 +395,8 @@ export function unidadesDeDocs(docs) {
 
 /** El catálogo de productos de una categoría, tal como se carga en Ajustes. */
 export function catalogoDe(tipo, config) {
-  if (tipo === 'placa') return config?.placas || [];
   if (tipo === 'adicional') return config?.adicionales || [];
   return [];
-}
-
-/**
- * Superficie de una placa, en m². Se carga en un solo casillero.
- * Los renglones viejos guardaban ancho y alto por separado: si vienen así,
- * se multiplican, para que un presupuesto de antes siga dando lo mismo.
- */
-export function superficiePlaca(item) {
-  if (item?.m2 != null && item.m2 !== '') return Number(item.m2) || 0;
-  return (Number(item?.anchoM) || 0) * (Number(item?.altoM) || 0);
 }
 
 /**
@@ -438,11 +409,6 @@ export function superficiePlaca(item) {
  */
 export function descripcionItem(item) {
   if (item.tipo === 'adicional') return item.producto || 'Adicional';
-  if (item.tipo === 'placa') {
-    // Con coma, como se escribe acá: este texto sale impreso en el presupuesto.
-    const m2 = String(superficiePlaca(item)).replace('.', ',');
-    return [item.producto || 'Placa', `${m2} m²`].filter(Boolean).join(' ');
-  }
   if (item.tipo !== 'tela_tradicional') return null;
   const ancho = Number(item.anchoM) || 0;
   const alto = Number(item.altoM) || 0;
@@ -572,7 +538,6 @@ export function factorLista(config) {
  * que se cobró o costó hace meses.
  */
 export function calcularItem(item, config, contexto = {}) {
-  if (item.tipo === 'placa') return calcularItemPlaca(item, config);
   if (item.tipo === 'adicional') return calcularItemAdicional(item, config);
   if (item.tipo === 'tela_tradicional') return calcularItemTelaTradicional(item, config, contexto);
 
@@ -655,76 +620,6 @@ export function calcularItem(item, config, contexto = {}) {
     automatizada: !!costoMotorUnit,
     costoMotor: costoMotorUnit * cantidad,
     // Costo propio (sin incremento) para saber el margen real.
-    costoPropio,
-  };
-}
-
-/**
- * Placa: precio de contado por m² (cargado en Ajustes) × superficie, más
- * colocación (por m², opcional) y envío (fijo, opcional) — los tres a precio
- * de contado. El de lista sale de aplicarle el mismo factor que a las
- * cortinas (ver factorLista): colocación y envío también se inflan, a
- * diferencia de la instalación de una cortina, porque acá los tres montos ya
- * vienen dados como costo de contado.
- */
-function calcularItemPlaca(item, config) {
-  const producto = (config.placas || []).find((p) => p.id === item.productoId);
-  const cantidad = Math.max(1, Number(item.cantidad) || 1);
-  const area = superficiePlaca(item);
-
-  const precioM2 = Number(producto?.precio) || 0;
-  const base = area * precioM2;
-
-  // La ganancia se calcula sobre la placa, igual que en las cortinas se
-  // calcula sobre tela y sistema: colocación y envío se suman después.
-  const reglaInc = config.incrementos?.placa || { activo: false, valor: 0 };
-  const incrementoPct = reglaInc.activo ? Number(reglaInc.valor) || 0 : 0;
-  const montoIncremento = base * (incrementoPct / 100);
-  const conIncremento = base + montoIncremento;
-
-  const costoColocacionUnit = item.colocacion ? area * (Number(config.placaColocacionM2) || 0) : 0;
-  const costoEnvioUnit = item.envio ? Number(config.placaEnvioFijo) || 0 : 0;
-  const contadoUnit = conIncremento + costoColocacionUnit + costoEnvioUnit;
-
-  const fijado = item.precioFijado != null && Number.isFinite(Number(item.precioFijado));
-  const precioUnitario = fijado
-    ? Number(item.precioFijado)
-    : redondear(contadoUnit * factorLista(config), config.redondeo);
-
-  const costoPropio = item.costoFijado != null && Number.isFinite(Number(item.costoFijado))
-    ? (Number(item.costoFijado) + costoColocacionUnit + costoEnvioUnit) * cantidad
-    : (base + costoColocacionUnit + costoEnvioUnit) * cantidad;
-
-  return {
-    fijado,
-    m2Real: area,
-    m2: area,
-    aplicaMinimo: false,
-    // Una placa se cotiza por superficie, no por ancho × alto: los dejamos en
-    // cero para que se note si alguna pantalla los muestra sin querer.
-    anchoM: 0,
-    altoM: 0,
-    cantidad,
-    precioTela: precioM2,
-    sistemaKey: null,
-    sistemaNombre: item.producto || producto?.nombre || '',
-    precioSistema: 0,
-    costoTela: base,
-    costoSistema: 0,
-    base,
-    incrementoPct,
-    montoIncremento,
-    conIncremento,
-    precioUnitario,
-    total: precioUnitario * cantidad,
-    // Colocación reusa el mismo casillero que la instalación de una cortina:
-    // así Pedidos y Caja la siguen viendo como "lo que hay que pagarle a
-    // alguien" sin que haga falta tocar esas pantallas.
-    costoInstalador: costoColocacionUnit * cantidad,
-    costoColocacion: costoColocacionUnit * cantidad,
-    costoEnvio: costoEnvioUnit * cantidad,
-    automatizada: false,
-    costoMotor: 0,
     costoPropio,
   };
 }

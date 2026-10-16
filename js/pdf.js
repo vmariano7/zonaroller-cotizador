@@ -70,7 +70,7 @@ export function imprimirPresupuesto(p) {
   const validez = sumarDias(p.fecha, dias);
   const ctd = datosContado(p, estado.config, t.total);
   // Título de la columna de descripción: "Cortina" si son todas cortinas,
-  // "Placa" o "Adicional" si son sólo eso, y "Producto" cuando se mezclan.
+  // "Adicional" si son sólo eso, y "Producto" cuando se mezclan.
   const categorias = Object.keys(t.unidades).filter((c) => t.unidades[c] > 0);
   const columna = categorias.length === 1 ? capitalizar(CATEGORIA[categorias[0]].singular) : 'Producto';
 
@@ -105,7 +105,7 @@ export function imprimirPresupuesto(p) {
         ${t.lineas.map(({ item, calc }) => `
           <tr>
             <td>${esc(item.ambiente || '—')}</td>
-            <td>${esc(descripcionItem(item) || `${NOMBRE_TIPO[item.tipo] || item.tipo} · ${item.tela}`)}${calc.soloTela ? '<br><span style="font-size:8pt">Solo tela</span>' : ''}${calc.automatizada ? '<br><span style="font-size:8pt">Automatizada, con motor</span>' : ''}${item.tipo === 'placa' ? detallesTecnicos(item).map((d) => `<br><span style="font-size:8pt">${esc(d)}</span>`).join('') : ''}${item.detalle ? `<br><span style="font-size:8pt">${esc(item.detalle)}</span>` : ''}${item.instalacion ? '<br><span style="font-size:8pt">Instalación sin cargo</span>' : ''}</td>
+            <td>${esc(descripcionItem(item) || `${NOMBRE_TIPO[item.tipo] || item.tipo} · ${item.tela}`)}${calc.soloTela ? '<br><span style="font-size:8pt">Solo tela</span>' : ''}${calc.automatizada ? '<br><span style="font-size:8pt">Automatizada, con motor</span>' : ''}${item.detalle ? `<br><span style="font-size:8pt">${esc(item.detalle)}</span>` : ''}${item.instalacion ? '<br><span style="font-size:8pt">Instalación sin cargo</span>' : ''}</td>
             <td class="num">${medidaTexto(item, calc)}</td>
             <td class="num">${calc.cantidad}</td>
             <td class="num">${plata(calc.precioUnitario)}</td>
@@ -183,14 +183,12 @@ export function imprimirOrdenTrabajo(p) {
       </thead>
       <tbody>
         ${t.lineas.map(({ item, calc }) => {
-          // La placa va por superficie y el adicional por unidad: ninguno de
-          // los dos tiene ancho y alto que darle al taller.
-          const esPlaca = item.tipo === 'placa';
+          // El adicional va por unidad: no tiene ancho ni alto que darle al taller.
           const esAdicional = item.tipo === 'adicional';
           const enMetros = item.tipo === 'tela_tradicional';
-          const ancho = esAdicional ? '—' : esPlaca ? `${num(calc.m2)} m²` : enMetros ? `${num(item.anchoM)} m` : `${num(item.anchoCm, 0)} cm`;
-          const alto = esPlaca || esAdicional ? '—' : enMetros ? `${num(item.altoM)} m` : `${num(item.altoCm, 0)} cm`;
-          const subtitulo = esPlaca || esAdicional ? item.producto : `${item.tela}${enMetros ? ` ${item.color || ''}` : ''}`;
+          const ancho = esAdicional ? '—' : enMetros ? `${num(item.anchoM)} m` : `${num(item.anchoCm, 0)} cm`;
+          const alto = esAdicional ? '—' : enMetros ? `${num(item.altoM)} m` : `${num(item.altoCm, 0)} cm`;
+          const subtitulo = esAdicional ? item.producto : `${item.tela}${enMetros ? ` ${item.color || ''}` : ''}`;
           // El taller necesita todo el armado: comando, cadena, caída, caño.
           const detalle = [...detallesTecnicos(item), item.detalle].filter(Boolean).join(' · ');
           return `

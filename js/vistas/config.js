@@ -9,12 +9,11 @@ import { tienePin, definirPin } from '../candado.js';
 
 /**
  * Qué artículos llevan porcentaje de ganancia. Los cuatro tipos de cortina
- * salen de TIPOS; placas y adicionales tienen su propio catálogo, así que van
+ * salen de TIPOS; los adicionales tienen su propio catálogo, así que van
  * a mano. La clave es la misma que usa `config.incrementos`.
  */
 const ARTICULOS_INCREMENTO = [
   ...Object.entries(TIPOS).map(([tipo, def]) => [tipo, def.nombre]),
-  ['placa', 'Placas'],
   ['adicional', 'Adicionales'],
 ];
 
@@ -59,66 +58,27 @@ export function render(contenedor) {
       </div>
     </div>
 
-    <div class="grid grid--2">
-      <div class="tarjeta">
-        <div class="tarjeta__cab">
-          <span class="seccion-num">02</span>
-          <div><h2>Placas</h2><div class="mini">Precio de contado por m² de cada producto, colocación y envío.</div></div>
-        </div>
-        ${(c.placas || []).length ? `
-          <div class="lista">
-            ${(c.placas || []).map((p) => `
-              <div class="campo" style="display:flex;align-items:center;gap:.6rem">
-                <span style="flex:1;font-weight:500">${esc(p.nombre)}</span>
-                <strong>${plata(p.precio)}/m²</strong>
-              </div>`).join('')}
-          </div>
-        ` : '<div class="mini">Todavía no cargaste ninguna placa.</div>'}
-        <button class="btn btn--chico mt-16" data-gestionar-productos="placas" style="width:100%">Agregar / editar / borrar</button>
-
-        <div style="border-top:2px solid var(--linea-fuerte);margin:1rem 0 .8rem"></div>
-
-        <div class="campo" style="display:flex;align-items:center;gap:.6rem">
-          <label style="flex:1;margin:0;font-weight:500;color:var(--acento)">Colocación (por m²)</label>
-          <div class="con-prefijo" style="width:130px"><span>$</span>
-            <input type="number" inputmode="decimal" min="0" step="1" data-num="placaColocacionM2" value="${c.placaColocacionM2 ?? 0}">
-          </div>
-        </div>
-        <div class="campo" style="display:flex;align-items:center;gap:.6rem">
-          <label style="flex:1;margin:0;font-weight:500;color:var(--acento)">Envío (fijo)</label>
-          <div class="con-prefijo" style="width:130px"><span>$</span>
-            <input type="number" inputmode="decimal" min="0" step="1" data-num="placaEnvioFijo" value="${c.placaEnvioFijo ?? 0}">
-          </div>
-        </div>
-        <div class="banner banner--info" style="margin-top:.8rem">
-          <div>El precio de cada placa, la colocación y el envío son costos de <strong>contado</strong>:
-          al armar el presupuesto se les aplica el mismo descuento de contado/lista que a las cortinas
-          (ver "Precio de contado y mensaje" más abajo).</div>
-        </div>
+    <div class="tarjeta">
+      <div class="tarjeta__cab">
+        <span class="seccion-num">02</span>
+        <div><h2>Adicionales</h2><div class="mini">Precio de contado por unidad de cada producto.</div></div>
+        <div class="der"><button class="btn btn--chico" data-gestionar-productos="adicionales">Agregar / editar / borrar</button></div>
       </div>
-
-      <div class="tarjeta">
-        <div class="tarjeta__cab">
-          <span class="seccion-num">03</span>
-          <div><h2>Adicionales</h2><div class="mini">Precio de contado por unidad de cada producto.</div></div>
+      ${(c.adicionales || []).length ? `
+        <div class="lista">
+          ${(c.adicionales || []).map((p) => `
+            <div class="campo" style="display:flex;align-items:center;gap:.6rem">
+              <span style="flex:1;font-weight:500">${esc(p.nombre)}</span>
+              <strong>${plata(p.precio)}</strong>
+            </div>`).join('')}
         </div>
-        ${(c.adicionales || []).length ? `
-          <div class="lista">
-            ${(c.adicionales || []).map((p) => `
-              <div class="campo" style="display:flex;align-items:center;gap:.6rem">
-                <span style="flex:1;font-weight:500">${esc(p.nombre)}</span>
-                <strong>${plata(p.precio)}</strong>
-              </div>`).join('')}
-          </div>
-        ` : '<div class="mini">Todavía no cargaste ningún adicional.</div>'}
-        <button class="btn btn--chico mt-16" data-gestionar-productos="adicionales" style="width:100%">Agregar / editar / borrar</button>
-      </div>
+      ` : '<div class="mini">Todavía no cargaste ningún adicional.</div>'}
     </div>
 
     <div class="grid grid--2">
       <div class="tarjeta">
         <div class="tarjeta__cab">
-          <span class="seccion-num">04</span>
+          <span class="seccion-num">03</span>
           <div><h2>Costos de sistemas</h2><div class="mini">Valor por metro lineal (se calcula sobre el ancho).</div></div>
         </div>
         <div style="display:flex;justify-content:flex-end;margin-bottom:.4rem">
@@ -201,7 +161,7 @@ export function render(contenedor) {
       <div>
         <div class="tarjeta">
           <div class="tarjeta__cab">
-            <span class="seccion-num">05</span>
+            <span class="seccion-num">04</span>
             <div><h2>Incrementos</h2><div class="mini">Activá y definí el porcentaje por artículo.</div></div>
           </div>
           ${ARTICULOS_INCREMENTO.map(([tipo, nombre]) => {
@@ -219,16 +179,16 @@ export function render(contenedor) {
             </div>`;
           }).join('')}
           <div class="banner banner--info" style="margin:1rem 0 0">
-            <div>En Roller, Verticales y Zebra el incremento se calcula sobre tela y sistema.
-            En Tela Tradicional, sobre la fórmula fija del renglón de arriba. En Placas, sobre el
-            precio por m² del producto, y en Adicionales sobre el precio de cada unidad.
-            La instalación, la colocación y el envío se suman después, sin incremento.</div>
+            <div>En Roller, Verticales, Paneles orientales y Zebra el incremento se calcula sobre
+            tela y sistema. En Tela Tradicional, sobre la fórmula fija del renglón de arriba, y en
+            Adicionales sobre el precio de cada unidad. La instalación se suma después, sin
+            incremento.</div>
           </div>
         </div>
 
         <div class="tarjeta">
           <div class="tarjeta__cab">
-            <span class="seccion-num">06</span>
+            <span class="seccion-num">05</span>
             <div><h2>Reglas de cálculo</h2></div>
           </div>
           <div class="campos campos--2">
@@ -264,7 +224,7 @@ export function render(contenedor) {
 
     <div class="tarjeta">
       <div class="tarjeta__cab">
-        <span class="seccion-num">07</span>
+        <span class="seccion-num">06</span>
         <div><h2>Datos de Zona Roller</h2><div class="mini">Aparecen en el encabezado del PDF.</div></div>
       </div>
       <div class="campos campos--3">
@@ -288,7 +248,7 @@ export function render(contenedor) {
 
     <div class="tarjeta">
       <div class="tarjeta__cab">
-        <span class="seccion-num">08</span>
+        <span class="seccion-num">07</span>
         <div><h2>Precio de contado y mensaje</h2><div class="mini">Lo que sale por defecto en cada cotización. En cada presupuesto lo podés cambiar.</div></div>
       </div>
       <div class="campos campos--2">
@@ -323,7 +283,7 @@ export function render(contenedor) {
 
     <div class="tarjeta">
       <div class="tarjeta__cab">
-        <span class="seccion-num">09</span>
+        <span class="seccion-num">08</span>
         <div><h2>Tu cuenta</h2><div class="mini">Con la misma cuenta ves los mismos datos en la compu y en el celular.</div></div>
       </div>
       <div class="banner banner--${estado.sync.estado === 'error' ? 'error' : estado.sync.activa ? 'info' : 'aviso'}">
@@ -343,7 +303,7 @@ export function render(contenedor) {
 
     <div class="tarjeta">
       <div class="tarjeta__cab">
-        <span class="seccion-num">10</span>
+        <span class="seccion-num">09</span>
         <div><h2>PIN de acceso</h2><div class="mini">${tienePin() ? 'Activado: la app lo pide cada vez que se abre.' : 'Desactivado: la app abre directo.'}</div></div>
       </div>
       <div class="campos campos--2">
@@ -363,7 +323,7 @@ export function render(contenedor) {
 
     <div class="tarjeta">
       <div class="tarjeta__cab">
-        <span class="seccion-num">11</span>
+        <span class="seccion-num">10</span>
         <div><h2>Respaldo</h2><div class="mini">Bajá una copia de todo o restaurá desde un archivo.</div></div>
       </div>
       <div class="fila-botones">
@@ -745,20 +705,16 @@ function dialogoSistemas(alGuardar) {
 }
 
 /**
- * Agregar, editar o borrar productos de Placas o Adicionales: cada uno es
- * nombre + precio de contado (por m² en placas, por unidad en adicionales).
+ * Agregar, editar o borrar adicionales: cada uno es nombre + precio de
+ * contado por unidad.
  */
 function dialogoProductos(categoria, alGuardar) {
-  const esPlacas = categoria === 'placas';
-  const titulo = esPlacas ? 'Placas' : 'Adicionales';
-  const sufijoPrecio = esPlacas ? '/m²' : '';
   let lista = (estado.config[categoria] || []).map((p) => ({ ...p }));
   if (!lista.length) lista.push({ id: crypto.randomUUID(), nombre: '', precio: 0 });
 
-  const m = modal(`Productos: ${titulo}`, `
-    <div class="mini mb-16">${esPlacas
-      ? 'Precio de contado por m² de cada placa. En el cotizador se multiplica por la superficie (ancho × alto) y se le aplica el descuento de contado/lista.'
-      : 'Precio de contado por unidad. En el cotizador se multiplica por la cantidad y se le aplica el descuento de contado/lista.'}</div>
+  const m = modal('Adicionales', `
+    <div class="mini mb-16">Precio de contado por unidad. En el cotizador se multiplica por la
+    cantidad y se le aplica el descuento de contado/lista.</div>
     <div data-filas></div>
     <button class="btn btn--chico mt-16" data-agregar style="width:100%">+ Agregar producto</button>
     <div class="fila-botones fila-botones--fin mt-16">
@@ -771,11 +727,10 @@ function dialogoProductos(categoria, alGuardar) {
   function pintarFilas() {
     cajaFilas.innerHTML = lista.map((p, i) => `
       <div class="campo" style="display:flex;align-items:center;gap:.5rem;margin-bottom:.5rem">
-        <input data-nombre="${i}" placeholder="Ej. Placa decorativa 60x60" value="${esc(p.nombre)}" style="flex:1">
+        <input data-nombre="${i}" placeholder="Ej. Traba de seguridad" value="${esc(p.nombre)}" style="flex:1">
         <div class="con-prefijo" style="width:150px"><span>$</span>
           <input type="number" inputmode="decimal" min="0" step="1" data-precio="${i}" value="${Number(p.precio) || 0}">
         </div>
-        ${sufijoPrecio ? `<span class="mini">${esc(sufijoPrecio)}</span>` : ''}
         <button class="btn-icono" data-quitar="${i}" title="Quitar">&#10005;</button>
       </div>`).join('');
 

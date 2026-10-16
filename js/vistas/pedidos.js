@@ -274,7 +274,7 @@ export function renderEditor(contenedor, params = {}) {
   const existente = params.id ? obtener('pedidos', params.id) : null;
   const doc = existente ? { ...existente } : docVacio();
   // Un pedido "desde cero" siempre arranca en cortinas; uno existente puede
-  // venir de un presupuesto de placas, así que lo deducimos de sus renglones.
+  // venir de un presupuesto de adicionales, así que lo deducimos de sus renglones.
   const categoria = existente ? categoriaDoc(existente) : 'cortina';
   const cat = CATEGORIA[categoria];
 

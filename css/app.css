@@ -330,7 +330,7 @@ tbody tr:hover { background: var(--fondo-2); }
 }
 .tipo[aria-pressed="true"] .tipo__icono { color: var(--tinta); }
 
-/* Elegir la categoría al entrar al cotizador: Cortinas / Placas / Adicionales.
+/* Elegir la categoría al entrar al cotizador: Cortinas / Adicionales.
    En el celular son tres filas (ícono, texto y flecha); en la compu, tres
    tarjetas con el ícono arriba y el texto abajo. */
 .categorias { display: grid; gap: .55rem; }

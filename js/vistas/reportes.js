@@ -8,8 +8,8 @@ import { columnasApiladas, barrasHorizontales, tablaDeSeries, SERIES } from '../
 import { totalPedido, cobrado, costos, margen } from '../dinero.js';
 import { claveCliente } from './clientes.js';
 
-// Las columnas del gráfico de meses se dividen en cortinas, placas y
-// adicionales: tres tandas que se distinguen bien de un vistazo. El detalle
+// Las columnas del gráfico de meses se dividen en cortinas y adicionales:
+// dos tandas que se distinguen bien de un vistazo. El detalle
 // de qué tipo de cortina se vendió va aparte, en el ranking de abajo, donde
 // cada barra lleva su nombre escrito y no hay que adivinar por color.
 const ORDEN_CATEGORIAS = Object.keys(CATEGORIA);
@@ -53,7 +53,7 @@ function desglose(pedido) {
 
   // Tres cortes de lo mismo: por categoría (para el gráfico de meses), por
   // tipo y por tela o producto (para los rankings). Nada queda afuera: todo
-  // renglón cae en alguna categoría, sea cortina, placa o adicional.
+  // renglón cae en alguna categoría, sea cortina o adicional.
   const porCategoria = {};
   const unidades = {};
   const porTipo = {};
@@ -164,7 +164,7 @@ export function render(contenedor) {
       .filter((s) => s.valores.some((v) => v));
 
     // Ranking por tipo: acá aparece el detalle de las cortinas (roller,
-    // verticales, paneles…) y también las placas y los adicionales.
+    // verticales, paneles…) y también los adicionales.
     const tipos = {};
     const tiposUnidades = {};
     desgloses.forEach((x) => {
@@ -173,7 +173,7 @@ export function render(contenedor) {
     });
     const rankingTipos = Object.entries(tipos)
       .map(([tipo, valor]) => ({
-        // Placas y adicionales van en plural: acá son el rubro entero, no un renglón suelto.
+        // Los adicionales van en plural: acá son el rubro entero, no un renglón suelto.
         etiqueta: CATEGORIA[tipo]?.titulo || NOMBRE_TIPO[tipo] || tipo,
         valor,
         detalle: contarItems(tiposUnidades[tipo] || 0, categoriaItem({ tipo })),
@@ -245,7 +245,7 @@ export function render(contenedor) {
       <div class="tarjeta">
         <div class="tarjeta__cab">
           <span class="seccion-num">01</span>
-          <div><h2>Ventas por mes</h2><div class="mini">Cada columna se divide en cortinas, placas y adicionales.</div></div>
+          <div><h2>Ventas por mes</h2><div class="mini">Cada columna se divide en cortinas y adicionales.</div></div>
           <div class="der" style="display:flex;gap:.5rem;align-items:center">
             <div class="segmentado" data-metrica>
               <button data-v="plata" aria-pressed="${metrica === 'plata'}">$</button>
@@ -261,7 +261,7 @@ export function render(contenedor) {
         <div class="tarjeta">
           <div class="tarjeta__cab">
             <span class="seccion-num">02</span>
-            <div><h2>Ventas por tipo</h2><div class="mini">Cada tipo de cortina, más placas y adicionales.</div></div>
+            <div><h2>Ventas por tipo</h2><div class="mini">Cada tipo de cortina, más los adicionales.</div></div>
           </div>
           <div data-gr-tipos></div>
         </div>

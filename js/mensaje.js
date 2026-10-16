@@ -7,17 +7,12 @@ import { categoriaDoc } from './calc.js';
 
 /**
  * Un texto por categoría: lo que se le dice al cliente de una cortina no es
- * lo mismo que lo de una placa o un adicional. Cada uno se edita por separado
- * en Ajustes; estos son los que salen si todavía no los tocaste.
+ * lo mismo que lo de un adicional. Cada uno se edita por separado en Ajustes;
+ * estos son los que salen si todavía no los tocaste.
  */
 export const PLANTILLAS_POR_DEFECTO = {
   cortina: `Esta cotización te saldría {lista}, que podes hacer en 3 y 6 pagos sin interés con tarjeta de crédito! Sino de contado tenes un {descuento}% de descuento y te queda en {contado}, que puede ser en efectivo o transferencia. Nuestro plazo de producción es de aprox {plazo} días hábiles, y tenes varios tipos de telas y colores a elegir dentro de ese precio!
 En caso que quieras avanzar, vamos a verificar las medidas al domicilio y luego las instalamos nosotros, asi que eso va sin cargo!
-Cualquier duda que tengas no dudes en consultarme!!
-
-¡Esperamos tu mensaje! 😊`,
-
-  placa: `Esta cotización te saldría {lista}, que podes hacer en 3 y 6 pagos sin interés con tarjeta de crédito! Sino de contado tenes un {descuento}% de descuento y te queda en {contado}, que puede ser en efectivo o transferencia. Nuestro plazo de entrega es de aprox {plazo} días hábiles.
 Cualquier duda que tengas no dudes en consultarme!!
 
 ¡Esperamos tu mensaje! 😊`,
