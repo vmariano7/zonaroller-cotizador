@@ -170,21 +170,24 @@ export function coloresDeSistema(id, config) {
 }
 
 /**
- * Los sistemas que hay para elegir en Ajustes: los guardados más los que el
- * cálculo puede asignar solo y todavía no estén en la lista. Sin esto, un
- * sistema nuevo no aparecería nunca en un config que se guardó antes de que
- * existiera. Los de un tipo de cortina retirado no se listan: no hay dónde
- * usarlos, aunque sigan guardados con su costo por si hace falta mirar un
- * presupuesto de entonces.
+ * Los sistemas que hay para elegir en Ajustes.
+ *
+ * Manda el catálogo guardado: si borrás uno desde Ajustes, se queda borrado.
+ * Los que trae el código entran una sola vez, con las migraciones, así que no
+ * hace falta rellenar la lista acá (ver migraciones.js). La única excepción es
+ * un config sin catálogo todavía: ahí van los del código, que es con lo que
+ * arranca cualquiera.
+ *
+ * Los de un tipo de cortina retirado no se listan: no hay dónde usarlos,
+ * aunque sigan guardados con su costo por si hace falta mirar un presupuesto
+ * de entonces.
  */
 export function sistemasDeConfig(config) {
   const guardados = (config?.catalogoSistemas || [])
     .map(sistemaNormalizado)
-    .filter((s) => !deTipoRetirado(s));
-  const faltantes = Object.entries(SISTEMAS)
-    .filter(([id]) => !guardados.some((s) => s.id === id))
-    .map(([id, def]) => sistemaNormalizado({ id, ...def, protegido: true }));
-  return [...guardados, ...faltantes];
+    .filter((s) => s.id && !deTipoRetirado(s));
+  if (guardados.length) return guardados;
+  return Object.entries(SISTEMAS).map(([id, def]) => sistemaNormalizado({ id, ...def, protegido: true }));
 }
 
 /**

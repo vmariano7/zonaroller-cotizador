@@ -801,7 +801,8 @@ function dialogoSistemas(alGuardar) {
     <div class="mini mb-16">Agregá, renombrá o borrá sistemas. Cada uno va atado a un tipo de cortina:
     en roller el sistema se elige a mano al cotizar, así que todos los de roller aparecen en ese
     selector; en los demás tipos lo elige solo el cálculo según la tela. Los colores van separados
-    por coma. Los marcados con ★ son los que asigna el cálculo.</div>
+    por coma. Los marcados con ★ son los que asigna el cálculo: si borrás uno, las cortinas que lo
+    usaban cotizan con $0 de sistema hasta que les pongas otro.</div>
     <div data-filas></div>
     <button class="btn btn--chico mt-16" data-agregar style="width:100%">+ Agregar sistema</button>
     <div class="fila-botones fila-botones--fin mt-16">
@@ -861,6 +862,11 @@ function dialogoSistemas(alGuardar) {
 
   m.cuerpo.querySelector('#ss-ok').onclick = async () => {
     const limpia = lista.map((s) => ({ ...s, nombre: s.nombre.trim() })).filter((s) => s.nombre);
+    // Los ★ son los que el cálculo asigna solo según la tela. Si borrás uno,
+    // esas cortinas pasan a cotizar con $0 de sistema: conviene decirlo.
+    const borradosDelCalculo = sistemasDeConfig(estado.config)
+      .filter((s) => s.protegido && !s.oculto && !limpia.some((x) => x.id === s.id))
+      .map((s) => s.nombre);
     const catalogoSistemas = limpia.map(({ id, nombre, tipo, colores, protegido, oculto }) => ({
       id,
       nombre,
@@ -872,7 +878,12 @@ function dialogoSistemas(alGuardar) {
     const sistemas = Object.fromEntries(limpia.map((s) => [s.id, s.precio]));
     await guardarConfig({ catalogoSistemas, sistemas });
     m.cerrar();
-    aviso('Sistemas actualizados.');
+    aviso(
+      borradosDelCalculo.length
+        ? `Sistemas actualizados. Borraste ${borradosDelCalculo.join(' y ')}: las cortinas que lo usaban van a cotizar con $0 de sistema.`
+        : 'Sistemas actualizados.',
+      borradosDelCalculo.length ? 'error' : 'ok'
+    );
     alGuardar?.();
   };
 }
