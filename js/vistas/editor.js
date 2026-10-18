@@ -4,7 +4,7 @@
 
 import { TIPOS, ARMADO, ARMADO_POR_TIPO, itemVacio, calcularItem, calcularTotales, hayPreciosCargados, descripcionItem, detallesTecnicos, admiteMotor, telasDeTipo, coloresDeTela, coloresDeSistema, sistemaConColor, catalogoDe, sistemasElegibles, sistemaAuto, categoriaItem } from '../calc.js';
 import { estado } from '../store.js';
-import { el, esc, plata, num, leerNumero, hoyISO, aviso } from '../ui.js';
+import { el, esc, plata, num, leerNumero, hoyISO, aviso, leerPrecio, montoCampo } from '../ui.js';
 import { armarMensaje, datosContado, copiar } from '../mensaje.js';
 import { sugerencias } from './clientes.js';
 
@@ -185,7 +185,7 @@ export function montarEditor(contenedor, doc, {
         </div>
         <div>
           <label for="c-ctd-man">Contado a mano <span class="mini">(vacío = automático)</span></label>
-          <div class="con-prefijo"><span>$</span><input id="c-ctd-man" type="number" min="0" step="1" data-doc="contadoManual" placeholder="automático"></div>
+          <div class="con-prefijo"><span>$</span><input id="c-ctd-man" type="text" inputmode="decimal" data-doc="contadoManual" data-plata placeholder="automático"></div>
         </div>
       </div>
       <div class="campo mt-16">
@@ -269,9 +269,13 @@ export function montarEditor(contenedor, doc, {
 
   contenedor.querySelectorAll('[data-doc]').forEach((inp) => {
     const clave = inp.dataset.doc;
-    inp.value = modelo[clave] ?? '';
+    // Los casilleros de plata son de texto y se escriben como se habla acá
+    // ("265.500"), así que van por leerPrecio. Ver ui.js.
+    const esPlata = inp.dataset.plata !== undefined;
+    inp.value = esPlata && modelo[clave] != null ? montoCampo(modelo[clave]) : (modelo[clave] ?? '');
     inp.addEventListener('input', () => {
-      if (inp.type === 'number') modelo[clave] = inp.value === '' ? null : Number(inp.value);
+      if (esPlata) modelo[clave] = inp.value.trim() === '' ? null : leerPrecio(inp.value);
+      else if (inp.type === 'number') modelo[clave] = inp.value === '' ? null : Number(inp.value);
       else modelo[clave] = inp.value;
       pintarMensaje();
       avisar();

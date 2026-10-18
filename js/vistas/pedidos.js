@@ -3,7 +3,7 @@
 import { estado, guardar, borrar, obtener, proximoNumero } from '../store.js';
 import { calcularTotales, descripcionItem, detallesTecnicos, CATEGORIA, categoriaDoc, frasearUnidades, unidadesDeDocs, NOMBRE_TIPO, telaConColor } from '../calc.js';
 import {
-  plata, num, fecha, esc, aviso, confirmar, chip, vacio, modal, hoyISO, leerNumero, ESTADOS_PEDIDO, medidaTexto,
+  plata, num, fecha, esc, aviso, confirmar, chip, vacio, modal, hoyISO, ESTADOS_PEDIDO, medidaTexto, leerPrecio, montoCampo,
 } from '../ui.js';
 import { navegar } from '../router.js';
 import { puede } from '../permisos.js';
@@ -404,8 +404,8 @@ export function renderDetalle(contenedor, params) {
         <div>
           <label for="p-acordado">Precio final acordado</label>
           <div class="con-prefijo"><span>$</span>
-            <input id="p-acordado" type="number" inputmode="decimal" min="0" step="1" data-acordado
-                   value="${v.acordado != null ? Math.round(v.acordado) : ''}" placeholder="${Math.round(v.segunModo)}">
+            <input id="p-acordado" type="text" inputmode="decimal" data-acordado
+                   value="${v.acordado != null ? montoCampo(Math.round(v.acordado)) : ''}" placeholder="${montoCampo(Math.round(v.segunModo))}">
           </div>
           <div class="mini" style="margin-top:.4rem">
             Vacío cobra el precio ${v.modo === 'contado' ? 'de contado' : 'de lista'}.
@@ -467,8 +467,8 @@ export function renderDetalle(contenedor, params) {
         <div>
           <label for="p-costo">Costo de materiales</label>
           <div class="con-prefijo"><span>$</span>
-            <input id="p-costo" type="number" inputmode="decimal" min="0" step="1" data-costo
-                   value="${cs.esManual ? Math.round(cs.materiales) : ''}" placeholder="${Math.round(cs.calculado)}">
+            <input id="p-costo" type="text" inputmode="decimal" data-costo
+                   value="${cs.esManual ? montoCampo(Math.round(cs.materiales)) : ''}" placeholder="${montoCampo(Math.round(cs.calculado))}">
           </div>
           <div class="mini" style="margin-top:.4rem">
             Con tus costos cargados da ${plata(cs.calculado)}. Si lo compraste con descuento,
@@ -575,7 +575,7 @@ export function renderDetalle(contenedor, params) {
 
   contenedor.querySelector('[data-acordado]').addEventListener('change', async (e) => {
     const crudo = e.target.value.trim();
-    const valor = crudo === '' ? null : Number(crudo);
+    const valor = crudo === '' ? null : leerPrecio(crudo);
     if (valor !== null && (!Number.isFinite(valor) || valor < 0)) {
       aviso('Poné un precio válido.', 'error');
       return;
@@ -609,7 +609,7 @@ export function renderDetalle(contenedor, params) {
   // El costo se guarda al salir del campo. Vacío = volver al calculado.
   contenedor.querySelector('[data-costo]')?.addEventListener('change', async (e) => {
     const crudo = e.target.value.trim();
-    const valor = crudo === '' ? null : Number(crudo);
+    const valor = crudo === '' ? null : leerPrecio(crudo);
     if (valor !== null && (!Number.isFinite(valor) || valor < 0)) {
       aviso('Poné un costo válido.', 'error');
       return;
@@ -637,7 +637,7 @@ export function renderDetalle(contenedor, params) {
   contenedor.querySelector('[data-pago]').addEventListener('click', () => {
     const m = modal('Registrar pago', `
       <div class="campos campos--2">
-        <div><label>Monto</label><div class="con-prefijo"><span>$</span><input id="pg-monto" type="number" inputmode="decimal" min="0" step="1" value="${Math.max(0, Math.round(debe))}"></div></div>
+        <div><label>Monto</label><div class="con-prefijo"><span>$</span><input id="pg-monto" type="text" inputmode="decimal" value="${montoCampo(Math.max(0, Math.round(debe)))}"></div></div>
         <div><label>Fecha</label><input id="pg-fecha" type="date" value="${hoyISO()}"></div>
       </div>
       <div class="campos campos--3 mt-16">
@@ -668,7 +668,7 @@ export function renderDetalle(contenedor, params) {
     sincronizarCaja();
 
     const registrar = async (conRecibo) => {
-      const monto = leerNumero(m.cuerpo.querySelector('#pg-monto').value);
+      const monto = leerPrecio(m.cuerpo.querySelector('#pg-monto').value);
       if (!monto || monto <= 0) {
         aviso('Poné un monto válido.', 'error');
         return;

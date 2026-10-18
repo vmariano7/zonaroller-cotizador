@@ -3,7 +3,7 @@
 
 import { estado, guardarConfig, cerrarSesion, sincronizar, exportarRespaldo, importarRespaldo } from '../store.js';
 import { TIPOS, CATEGORIA, sistemasDeConfig, telasDeTipo, precioBaseTela } from '../calc.js';
-import { esc, aviso, confirmar, descargarArchivo, fecha, plata, modal } from '../ui.js';
+import { esc, aviso, confirmar, descargarArchivo, fecha, plata, modal, leerPrecio, montoCampo } from '../ui.js';
 import { plantillaDe, CLAVES } from '../mensaje.js';
 import { tienePin, definirPin } from '../candado.js';
 
@@ -65,7 +65,7 @@ export function render(contenedor) {
               <div class="campo" style="display:flex;align-items:center;gap:.6rem">
                 <label style="flex:1;margin:0;font-weight:500;color:var(--acento)">${esc(nombre)}</label>
                 <div class="con-prefijo" style="width:130px"><span>$</span>
-                  <input type="number" inputmode="decimal" min="0" step="1" data-tela="${tipo}|${esc(nombre)}" value="${precioBaseTela(tipo, nombre, c)}">
+                  <input type="text" inputmode="decimal" data-tela="${tipo}|${esc(nombre)}" value="${montoCampo(precioBaseTela(tipo, nombre, c))}">
                 </div>
               </div>
               ${colores.length ? `
@@ -76,8 +76,8 @@ export function render(contenedor) {
                   <div class="campo" style="display:flex;align-items:center;gap:.6rem">
                     <label style="flex:1;margin:0">${esc(color)}</label>
                     <div class="con-prefijo" style="width:130px"><span>$</span>
-                      <input type="number" inputmode="decimal" min="0" step="1" placeholder="${precioBaseTela(tipo, nombre, c)}"
-                             data-tela-color="${tipo}|${esc(nombre)}|${esc(color)}" value="${porColor?.[color] ?? ''}">
+                      <input type="text" inputmode="decimal" placeholder="${montoCampo(precioBaseTela(tipo, nombre, c))}"
+                             data-tela-color="${tipo}|${esc(nombre)}|${esc(color)}" value="${porColor?.[color] == null ? '' : montoCampo(porColor[color])}">
                     </div>
                   </div>`).join('')}
               </details>` : ''}`;
@@ -126,7 +126,7 @@ export function render(contenedor) {
           <div class="campo" style="display:flex;align-items:center;gap:.6rem">
             <label style="flex:1;margin:0;font-weight:500">${esc(nombre)}</label>
             <div class="con-prefijo" style="width:140px"><span>$</span>
-              <input type="number" inputmode="decimal" min="0" step="1" data-sistema="${clave}" value="${c.sistemas?.[clave] ?? 0}">
+              <input type="text" inputmode="decimal" data-sistema="${clave}" value="${montoCampo(c.sistemas?.[clave] ?? 0)}">
             </div>
           </div>`).join('')}
 
@@ -136,19 +136,19 @@ export function render(contenedor) {
         <div class="campo" style="display:flex;align-items:center;gap:.6rem">
           <label style="flex:1;margin:0;font-weight:500;color:var(--acento)">Roller y Zebra</label>
           <div class="con-prefijo" style="width:140px"><span>$</span>
-            <input type="number" inputmode="decimal" min="0" step="1" data-inst="roller" value="${c.instalador?.roller ?? 15000}">
+            <input type="text" inputmode="decimal" data-inst="roller" value="${montoCampo(c.instalador?.roller ?? 15000)}">
           </div>
         </div>
         <div class="campo" style="display:flex;align-items:center;gap:.6rem">
           <label style="flex:1;margin:0;font-weight:500;color:var(--acento)">Bandas verticales y Tela tradicional</label>
           <div class="con-prefijo" style="width:140px"><span>$</span>
-            <input type="number" inputmode="decimal" min="0" step="1" data-inst="vertical" value="${c.instalador?.vertical ?? 20000}">
+            <input type="text" inputmode="decimal" data-inst="vertical" value="${montoCampo(c.instalador?.vertical ?? 20000)}">
           </div>
         </div>
         <div class="campo" style="display:flex;align-items:center;gap:.6rem">
           <label style="flex:1;margin:0;font-weight:500">Recargo</label>
           <div class="con-sufijo" style="width:140px">
-            <input type="number" inputmode="decimal" min="0" step="1" data-inst="recargoPct" value="${c.instalador?.recargoPct ?? 50}"><span>%</span>
+            <input type="text" inputmode="decimal" data-inst="recargoPct" value="${c.instalador?.recargoPct ?? 50}"><span>%</span>
           </div>
         </div>
         <div class="banner banner--info" style="margin-top:.8rem">
@@ -164,7 +164,7 @@ export function render(contenedor) {
         <div class="campo" style="display:flex;align-items:center;gap:.6rem">
           <label style="flex:1;margin:0;font-weight:500;color:var(--acento)">Costo del motor</label>
           <div class="con-prefijo" style="width:140px"><span>$</span>
-            <input type="number" inputmode="decimal" min="0" step="1" data-num="costoMotor" value="${c.costoMotor ?? 0}">
+            <input type="text" inputmode="decimal" data-num="costoMotor" value="${montoCampo(c.costoMotor ?? 0)}">
           </div>
         </div>
         <div class="banner banner--info" style="margin-top:.8rem">
@@ -179,7 +179,7 @@ export function render(contenedor) {
         <div class="campo" style="display:flex;align-items:center;gap:.6rem">
           <label style="flex:1;margin:0;font-weight:500;color:var(--acento)">Descuento por cortina</label>
           <div class="con-prefijo" style="width:140px"><span>$</span>
-            <input type="number" inputmode="decimal" min="0" step="1" data-num="soloTelaDescuento" value="${c.soloTelaDescuento ?? 0}">
+            <input type="text" inputmode="decimal" data-num="soloTelaDescuento" value="${montoCampo(c.soloTelaDescuento ?? 0)}">
           </div>
         </div>
         <div class="banner banner--info" style="margin-top:.8rem">
@@ -206,7 +206,7 @@ export function render(contenedor) {
               </label>
               <span style="flex:1;font-weight:600">${esc(nombre)}</span>
               <div class="con-sufijo" style="width:100px">
-                <input type="number" inputmode="decimal" min="0" step="1" data-inc-valor="${tipo}" value="${inc.valor ?? 0}"><span>%</span>
+                <input type="text" inputmode="decimal" data-inc-valor="${tipo}" value="${inc.valor ?? 0}"><span>%</span>
               </div>
             </div>`;
           }).join('')}
@@ -226,7 +226,7 @@ export function render(contenedor) {
           <div class="campos campos--2">
             <div>
               <label>Mínimo de metros cuadrados</label>
-              <div class="con-sufijo"><input type="number" inputmode="decimal" min="0" step="0.1" data-num="minimoM2" value="${c.minimoM2 ?? 1}"><span>m²</span></div>
+              <div class="con-sufijo"><input type="text" inputmode="decimal" data-num="minimoM2" value="${c.minimoM2 ?? 1}"><span>m²</span></div>
             </div>
             <div>
               <label>Redondeo del precio de lista</label>
@@ -247,7 +247,7 @@ export function render(contenedor) {
             </label>
             <span style="flex:1;font-weight:600">Agregar IVA al total</span>
             <div class="con-sufijo" style="width:100px">
-              <input type="number" inputmode="decimal" min="0" step="1" data-iva-valor value="${c.iva?.valor ?? 21}"><span>%</span>
+              <input type="text" inputmode="decimal" data-iva-valor value="${c.iva?.valor ?? 21}"><span>%</span>
             </div>
           </div>
         </div>
@@ -286,11 +286,11 @@ export function render(contenedor) {
       <div class="campos campos--2">
         <div>
           <label>Descuento de contado</label>
-          <div class="con-sufijo"><input type="number" inputmode="decimal" min="0" max="100" step="1" data-ctd="descuentoPct" value="${c.contado?.descuentoPct ?? 35}"><span>%</span></div>
+          <div class="con-sufijo"><input type="text" inputmode="decimal" data-ctd="descuentoPct" value="${c.contado?.descuentoPct ?? 35}"><span>%</span></div>
         </div>
         <div>
           <label>Plazo de producción</label>
-          <div class="con-sufijo"><input type="number" inputmode="numeric" min="0" step="1" data-ctd="plazoDias" value="${c.contado?.plazoDias ?? 5}"><span>días</span></div>
+          <div class="con-sufijo"><input type="text" inputmode="decimal" data-ctd="plazoDias" value="${c.contado?.plazoDias ?? 5}"><span>días</span></div>
         </div>
       </div>
       <div class="banner banner--info" style="margin-top:.8rem">
@@ -369,10 +369,11 @@ export function render(contenedor) {
     </div>
   `;
 
-  // Todos los casilleros de acá abajo son <input type="number">, y esos siempre
-  // entregan el valor con punto decimal y sin separador de miles. leerNumero,
-  // que está pensado para texto en formato argentino, leería "1.5" como 15.
-  const leerCasillero = (inp) => Number(inp.value) || 0;
+  // Los casilleros de plata son de texto, no <input type="number">: ese tipo de
+  // casillero descarta la coma y entrega vacío, así que un precio bien escrito
+  // ("23.829,75") se guardaba en 0. leerPrecio entiende las dos formas de
+  // escribirlo. Ver ui.js.
+  const leerCasillero = (inp) => leerPrecio(inp.value) || 0;
 
   /* ---- Precios de telas ---- */
   // El precio de una tela es un número suelto, salvo cuando algún color vale
@@ -681,7 +682,7 @@ function dialogoTelas(tipo, alGuardar) {
         <div style="display:flex;align-items:center;gap:.5rem">
           <input data-nombre="${i}" placeholder="Ej. Sunscreen 3%" value="${esc(t.nombre)}" style="flex:1">
           <div class="con-prefijo" style="width:130px"><span>$</span>
-            <input type="number" inputmode="decimal" min="0" step="1" data-precio="${i}" value="${t.precio}">
+            <input type="text" inputmode="decimal" data-precio="${i}" value="${montoCampo(t.precio)}">
           </div>
           <button class="btn-icono" data-quitar="${i}" title="Quitar">&#10005;</button>
         </div>
@@ -696,7 +697,7 @@ function dialogoTelas(tipo, alGuardar) {
       inp.addEventListener('input', () => { lista[Number(inp.dataset.nombre)].nombre = inp.value; })
     );
     cajaFilas.querySelectorAll('[data-precio]').forEach((inp) =>
-      inp.addEventListener('input', () => { lista[Number(inp.dataset.precio)].precio = Number(inp.value) || 0; })
+      inp.addEventListener('input', () => { lista[Number(inp.dataset.precio)].precio = leerPrecio(inp.value) || 0; })
     );
     cajaFilas.querySelectorAll('[data-quitar]').forEach((b) =>
       b.addEventListener('click', () => {
@@ -786,7 +787,7 @@ function dialogoSistemas(alGuardar) {
           <input data-nombre="${i}" placeholder="Nombre del sistema" value="${esc(s.nombre)}" style="flex:1">
           ${s.protegido ? '<span class="mini" title="Lo asigna solo el cálculo">★</span>' : ''}
           <div class="con-prefijo" style="width:140px"><span>$</span>
-            <input type="number" inputmode="decimal" min="0" step="1" data-precio="${i}" value="${s.precio}">
+            <input type="text" inputmode="decimal" data-precio="${i}" value="${montoCampo(s.precio)}">
           </div>
           <button class="btn-icono" data-quitar="${i}" title="Quitar">&#10005;</button>
         </div>
@@ -811,7 +812,7 @@ function dialogoSistemas(alGuardar) {
       inp.addEventListener('input', () => { lista[Number(inp.dataset.nombre)].nombre = inp.value; })
     );
     cajaFilas.querySelectorAll('[data-precio]').forEach((inp) =>
-      inp.addEventListener('input', () => { lista[Number(inp.dataset.precio)].precio = Number(inp.value) || 0; })
+      inp.addEventListener('input', () => { lista[Number(inp.dataset.precio)].precio = leerPrecio(inp.value) || 0; })
     );
     cajaFilas.querySelectorAll('[data-quitar]').forEach((b) =>
       b.addEventListener('click', () => {
@@ -880,7 +881,7 @@ function dialogoProductos(categoria, alGuardar) {
       <div class="campo" style="display:flex;align-items:center;gap:.5rem;margin-bottom:.5rem">
         <input data-nombre="${i}" placeholder="Ej. Traba de seguridad" value="${esc(p.nombre)}" style="flex:1">
         <div class="con-prefijo" style="width:150px"><span>$</span>
-          <input type="number" inputmode="decimal" min="0" step="1" data-precio="${i}" value="${Number(p.precio) || 0}">
+          <input type="text" inputmode="decimal" data-precio="${i}" value="${montoCampo(Number(p.precio) || 0)}">
         </div>
         <button class="btn-icono" data-quitar="${i}" title="Quitar">&#10005;</button>
       </div>`).join('');
@@ -889,7 +890,7 @@ function dialogoProductos(categoria, alGuardar) {
       inp.addEventListener('input', () => { lista[Number(inp.dataset.nombre)].nombre = inp.value; })
     );
     cajaFilas.querySelectorAll('[data-precio]').forEach((inp) =>
-      inp.addEventListener('input', () => { lista[Number(inp.dataset.precio)].precio = Number(inp.value) || 0; })
+      inp.addEventListener('input', () => { lista[Number(inp.dataset.precio)].precio = leerPrecio(inp.value) || 0; })
     );
     cajaFilas.querySelectorAll('[data-quitar]').forEach((b) =>
       b.addEventListener('click', () => {

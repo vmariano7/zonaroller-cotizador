@@ -131,6 +131,40 @@ export function leerNumero(valor) {
   return Number.isFinite(n) ? n : null;
 }
 
+/**
+ * Lee plata escrita como se escribe acá: "23.829,75", "23829,75" o "23829.75".
+ * Devuelve null cuando no hay nada escrito.
+ *
+ * El punto es ambiguo —puede ser de miles o decimal—, así que se decide por la
+ * pinta: si hay coma, la coma es el decimal y los puntos son de miles; si no
+ * hay coma, un solo punto con exactamente tres dígitos atrás también es de
+ * miles ("23.829"), y en cualquier otro caso es decimal ("23.5").
+ *
+ * Esto está en vez de los <input type="number">: en castellano son una trampa,
+ * porque el navegador descarta la coma y entrega el casillero vacío. Quien
+ * escribía un precio bien puesto terminaba guardando un 0 sin enterarse.
+ */
+export function leerPrecio(texto) {
+  const limpio = String(texto ?? '').trim().replace(/\s/g, '');
+  if (limpio === '') return null;
+  const puntos = (limpio.match(/\./g) || []).length;
+  let normal;
+  if (limpio.includes(',')) normal = limpio.replace(/\./g, '').replace(',', '.');
+  else if (puntos > 1) normal = limpio.replace(/\./g, '');
+  else normal = /\.\d{3}$/.test(limpio) ? limpio.replace('.', '') : limpio;
+  const n = Number(normal);
+  return Number.isFinite(n) ? n : null;
+}
+
+/**
+ * Cómo se escribe un importe adentro de un casillero: "23.829,75". Lo que sale
+ * de acá lo vuelve a leer leerPrecio tal cual.
+ */
+export function montoCampo(n) {
+  const v = Number(n);
+  return Number.isFinite(v) ? num(v, 2) : '';
+}
+
 export function descargarArchivo(nombre, contenido, tipo = 'application/json') {
   const blob = new Blob([contenido], { type: tipo });
   const url = URL.createObjectURL(blob);

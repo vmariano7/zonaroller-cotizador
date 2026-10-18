@@ -1,7 +1,7 @@
 // Flujo de caja: qué falta cobrar, qué falta pagar y cómo viene el mes.
 
 import { estado, guardar, borrar, guardarConfig } from '../store.js';
-import { plata, num, fecha, esc, aviso, confirmar, modal, hoyISO, leerNumero, chip, capitalizar, ESTADOS_PEDIDO } from '../ui.js';
+import { plata, num, fecha, esc, aviso, confirmar, modal, hoyISO, chip, capitalizar, ESTADOS_PEDIDO, leerPrecio, montoCampo } from '../ui.js';
 import { navegar } from '../router.js';
 import { totalPedido, cobrado, saldo, costoInstalacion, costos, saldosCaja, CAJAS, cajaDeMedio } from '../dinero.js';
 
@@ -360,10 +360,10 @@ function dialogoSaldos(alGuardar) {
     hasta acá se considera parte de estos números.</div>
     <div class="campos campos--2">
       <div><label>${esc(CAJAS.efectivo.nombre)}</label>
-        <div class="con-prefijo"><span>$</span><input id="sd-efectivo" type="number" inputmode="decimal" step="1" value="${Number(s.efectivo) || 0}"></div>
+        <div class="con-prefijo"><span>$</span><input id="sd-efectivo" type="text" inputmode="decimal" value="${montoCampo(Number(s.efectivo) || 0)}"></div>
       </div>
       <div><label>${esc(CAJAS.cuenta.nombre)}</label>
-        <div class="con-prefijo"><span>$</span><input id="sd-cuenta" type="number" inputmode="decimal" step="1" value="${Number(s.cuenta) || 0}"></div>
+        <div class="con-prefijo"><span>$</span><input id="sd-cuenta" type="text" inputmode="decimal" value="${montoCampo(Number(s.cuenta) || 0)}"></div>
       </div>
     </div>
     ${s.desde ? `<div class="mini mt-16">El corte actual es del ${fecha(diaLocal(s.desde))}. Al guardar se corre a hoy y se vuelve a arrancar de cero.</div>` : ''}
@@ -373,7 +373,7 @@ function dialogoSaldos(alGuardar) {
     </div>`, { ancho: '520px' });
 
   m.cuerpo.querySelector('#sd-ok').onclick = async () => {
-    const leer = (id) => Number(m.cuerpo.querySelector(id).value) || 0;
+    const leer = (id) => leerPrecio(m.cuerpo.querySelector(id).value) || 0;
     await guardarConfig({
       saldos: { desde: new Date().toISOString(), efectivo: leer('#sd-efectivo'), cuenta: leer('#sd-cuenta') },
     });
@@ -410,7 +410,7 @@ function dialogoProveedores(alGuardar) {
       <div class="campo" style="display:flex;align-items:center;gap:.5rem;margin-bottom:.5rem">
         <input data-nombre="${i}" placeholder="Ej. Fábrica de telas" value="${esc(pr.nombre)}" style="flex:1">
         <div class="con-prefijo" style="width:150px"><span>$</span>
-          <input type="number" inputmode="decimal" min="0" step="1" data-saldo="${i}" value="${pr.saldo}">
+          <input type="text" inputmode="decimal" data-saldo="${i}" value="${montoCampo(pr.saldo)}">
         </div>
         <button class="btn-icono" data-quitar="${i}" title="Quitar">&#10005;</button>
       </div>`).join('');
@@ -419,7 +419,7 @@ function dialogoProveedores(alGuardar) {
       inp.addEventListener('input', () => { lista[Number(inp.dataset.nombre)].nombre = inp.value; })
     );
     cajaFilas.querySelectorAll('[data-saldo]').forEach((inp) =>
-      inp.addEventListener('input', () => { lista[Number(inp.dataset.saldo)].saldo = Number(inp.value) || 0; })
+      inp.addEventListener('input', () => { lista[Number(inp.dataset.saldo)].saldo = leerPrecio(inp.value) || 0; })
     );
     cajaFilas.querySelectorAll('[data-quitar]').forEach((b) =>
       b.addEventListener('click', () => {
@@ -462,7 +462,7 @@ function dialogoMovimiento(alGuardar) {
           ${Object.entries(CAJAS).map(([k, v]) => `<option value="${k}"${k === 'cuenta' ? ' selected' : ''}>${esc(v.nombre)}</option>`).join('')}
         </select>
       </div>
-      <div><label>Monto</label><div class="con-prefijo"><span>$</span><input id="mv-monto" type="number" inputmode="decimal" min="0" step="1"></div></div>
+      <div><label>Monto</label><div class="con-prefijo"><span>$</span><input id="mv-monto" type="text" inputmode="decimal" placeholder="0"></div></div>
     </div>
     <div class="campo mt-16"><label>Nota</label><input id="mv-nota" placeholder="Opcional"></div>
     <div class="fila-botones fila-botones--fin mt-16">
@@ -480,7 +480,7 @@ function dialogoMovimiento(alGuardar) {
   pintarRubros();
 
   m.cuerpo.querySelector('#mv-ok').onclick = async () => {
-    const monto = leerNumero(m.cuerpo.querySelector('#mv-monto').value);
+    const monto = leerPrecio(m.cuerpo.querySelector('#mv-monto').value);
     const concepto = m.cuerpo.querySelector('#mv-concepto').value.trim();
     if (!monto || monto <= 0) return aviso('Poné un monto válido.', 'error');
     if (!concepto) return aviso('Escribí un concepto.', 'error');
