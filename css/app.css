@@ -599,10 +599,16 @@ tbody tr:hover { background: var(--fondo-2); }
 .hoja { display: none; }
 
 @media print {
-  @page { size: A4; margin: 14mm 12mm; }
+  /* Los 6mm de arriba y abajo son a proposito: Chrome dibuja su encabezado y
+     su pie (la fecha, el titulo de la pestania y la URL de la app) en el margen
+     de la hoja, pero solo si entran. Hasta 8mm no los imprime; de 10mm para
+     arriba, si. Los 6mm que faltan para el aire de siempre los pone el padding
+     de .hoja, que ademas se aplica una sola vez: en un documento de varias
+     carillas, las siguientes quedan con el margen de @page. */
+  @page { size: A4; margin: 6mm 12mm; }
   body { background: #fff; font-size: 11pt; }
   .app, .avisos, .modal-fondo { display: none !important; }
-  .hoja { display: block !important; color: #000; }
+  .hoja { display: block !important; color: #000; padding: 8mm 0; }
   a { color: #000; text-decoration: none; }
 }
 
