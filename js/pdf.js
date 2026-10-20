@@ -40,7 +40,7 @@ export function montarHoja(html, tituloVentana, claseExtra = '') {
   setTimeout(limpiar, 60000);
 }
 
-function encabezado(emp) {
+export function encabezado(emp) {
   return `
     <div class="hoja__cab">
       <div>

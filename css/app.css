@@ -638,3 +638,37 @@ tbody tr:hover { background: var(--fondo-2); }
 .recibo__medios { margin-left: 15%; font-weight: 700; }
 .recibo__medios div { padding: 2px 0; }
 .recibo__saldo { margin-top: 70px; text-align: right; font-weight: 700; }
+
+/* Certificado de garantía: dos columnas de condiciones en una sola carilla. */
+.hoja--garantia .garantia__plazo {
+  margin-left: auto; background: #b4531f; color: #fff; border-radius: 4px;
+  padding: 4px 11px; font-size: 11pt; font-weight: 800; letter-spacing: .02em; white-space: nowrap;
+}
+.hoja--garantia .garantia__intro { font-size: 10pt; line-height: 1.55; margin-bottom: 10px; }
+.hoja--garantia .garantia__cliente {
+  border: 1px solid #ccc; border-radius: 6px; padding: 9px 13px 11px; margin-bottom: 12px;
+}
+.hoja--garantia .garantia__cliente span { display: block; font-size: 8pt; color: #555; margin-bottom: 6px; }
+.hoja--garantia .garantia__cliente strong { font-size: 11pt; }
+/* Sin nombre cargado queda el renglón para completar a mano. */
+.hoja--garantia .garantia__cliente i { display: block; border-bottom: .7px solid #888; margin-top: 12px; }
+.hoja--garantia .garantia__cols { display: flex; gap: 18px; margin-bottom: 12px; }
+.hoja--garantia .garantia__col { flex: 1; }
+.hoja--garantia .garantia__bloque { margin-bottom: 12px; }
+.hoja--garantia h3 {
+  margin: 0 0 6px; font-size: 8pt; font-weight: 700; text-transform: uppercase; letter-spacing: .08em;
+}
+.hoja--garantia .garantia__si { color: #14794b; }
+.hoja--garantia .garantia__no { color: #b3261e; }
+.hoja--garantia ul { margin: 0; padding-left: 15px; font-size: 9.8pt; line-height: 1.5; }
+.hoja--garantia li { margin-bottom: 3px; }
+.hoja--garantia .garantia__cols, .hoja--garantia .garantia__bloque { page-break-inside: avoid; }
+.hoja--garantia .garantia__firmas { display: flex; gap: 40px; margin-bottom: 8px; }
+.hoja--garantia .garantia__firmas > div { flex: 1; }
+.hoja--garantia .garantia__firmas i { display: block; border-bottom: .7px solid #888; margin-bottom: 4px; height: 22px; }
+.hoja--garantia .garantia__firmas span { font-size: 7.5pt; color: #555; }
+/* La garantía entra justa en una carilla: el encabezado y el pie van más
+   ajustados que en el presupuesto para dejar aire de sobra. */
+.hoja--garantia .hoja__cab { margin-bottom: 12px; }
+.hoja--garantia .hoja__titulo { margin-bottom: 10px; }
+.hoja--garantia .hoja__pie { margin-top: 14px; }

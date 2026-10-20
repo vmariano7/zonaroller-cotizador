@@ -9,6 +9,7 @@ import { navegar } from '../router.js';
 import { puede } from '../permisos.js';
 import { imprimirOrdenTrabajo } from '../pdf.js';
 import { imprimirRecibo } from '../recibo.js';
+import { imprimirGarantia } from '../garantia.js';
 import { montarEditor, docVacio } from './editor.js';
 import { totalPedido, cobrado, saldo, costos, margen, venta, CAJAS, cajaDeMedio } from '../dinero.js';
 
@@ -380,6 +381,7 @@ export function renderDetalle(contenedor, params) {
       <div class="der">
         <a class="btn" href="#/pedido-editar/${p.id}">Editar</a>
         <button class="btn" data-ot>Orden de trabajo</button>
+        <button class="btn" data-garantia>Garantía</button>
       </div>
     </div>
 
@@ -626,6 +628,7 @@ export function renderDetalle(contenedor, params) {
   });
 
   contenedor.querySelector('[data-ot]').addEventListener('click', () => imprimirOrdenTrabajo(p));
+  contenedor.querySelector('[data-garantia]').addEventListener('click', () => imprimirGarantia(p));
 
   contenedor.querySelector('[data-eliminar]').addEventListener('click', async () => {
     if (!(await confirmar(`¿Eliminar el pedido ${p.numero}? No se puede deshacer.`, { textoOk: 'Eliminar', peligro: true }))) return;
@@ -730,6 +733,7 @@ function renderHojaDeRuta(contenedor, p) {
       </div>
       <div class="der">
         <button class="btn btn--primario" data-ot>Orden de trabajo</button>
+        <button class="btn" data-garantia>Garantía</button>
       </div>
     </div>
 
@@ -784,4 +788,5 @@ function renderHojaDeRuta(contenedor, p) {
   `;
 
   contenedor.querySelector('[data-ot]').addEventListener('click', () => imprimirOrdenTrabajo(p));
+  contenedor.querySelector('[data-garantia]').addEventListener('click', () => imprimirGarantia(p));
 }
