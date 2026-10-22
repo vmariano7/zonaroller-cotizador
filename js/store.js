@@ -32,6 +32,20 @@ const TABLAS = {
 
 const oyentes = new Set();
 
+/**
+ * ¿Pudimos leer la config de la nube en esta sesión?
+ *
+ * Mientras la respuesta sea que no, la copia que tenemos en este aparato puede
+ * estar vieja o recién estrenada (toda en cero), y subirla pisaría la de todos
+ * los demás. Así que no se sube: se guarda acá y se manda recién cuando la
+ * nube conteste y se pueda comparar cuál es más nueva (ver faltaSubirConfig).
+ *
+ * Esto pasó de verdad: alguien abrió la app por primera vez en su aparato, esa
+ * primera lectura falló, y la configuración en blanco terminó arriba de la
+ * buena. Los precios de todos volvieron a cero.
+ */
+let configConfirmada = false;
+
 export const estado = {
   config: configVacia(),
   presupuestos: [],
@@ -225,6 +239,10 @@ export async function sincronizar() {
       ...COLECCIONES.map((c) => pedir(`${TABLAS[c]}?select=*&borrado=is.false&order=actualizado.desc`)),
     ]);
 
+    // La nube contestó. Puede no haber fila todavía (cuenta nueva), pero ya
+    // sabemos qué hay allá, así que de acá en más se puede comparar y subir.
+    configConfirmada = true;
+
     if (Array.isArray(config) && config[0]?.datos) {
       // La config de la nube manda, salvo que la de acá sea más nueva y todavía
       // no haya subido (se guardó algo sin señal, o falló el envío). En ese
@@ -272,6 +290,9 @@ export async function sincronizar() {
  * precios. Ver migraciones.js.
  */
 async function aplicarMigraciones() {
+  // Nunca sobre una config sin confirmar: migrar la escribe, y escribirla la
+  // sube. Si la nube no contestó, esto espera a la próxima sincronización.
+  if (leerSesion() && !configConfirmada) return;
   const cambios = migrarConfig(estado.config);
   if (cambios) await guardarConfig(cambios);
 }
@@ -308,6 +329,16 @@ export async function guardarConfig(nuevaConfig) {
   avisar();
 
   if (!leerSesion()) return;
+  if (!configConfirmada) {
+    // Ver configConfirmada: se guardó acá y sube sola cuando la nube conteste.
+    estado.sync = {
+      ...estado.sync,
+      estado: 'error',
+      mensaje: 'Guardado en este dispositivo. Todavía no pude leer la configuración de la nube, así que no la piso hasta sincronizar.',
+    };
+    avisar();
+    return;
+  }
   try {
     await pedir(`${TABLAS.config}?on_conflict=id`, {
       method: 'POST',
