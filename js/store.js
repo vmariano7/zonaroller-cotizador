@@ -46,6 +46,39 @@ const oyentes = new Set();
  */
 let configConfirmada = false;
 
+/**
+ * Lo que se guardó en este aparato y todavía no pudo subir: un pago, un cambio
+ * de estado, un pedido nuevo. Se guarda junto con los datos, así que aguanta
+ * cerrar la app, y se reintenta en cada sincronización.
+ *
+ * Sin esto, un cambio que no llegaba a la nube —porque se venció la sesión o
+ * no había señal— lo borraba la próxima sincronización sin decir nada: al bajar
+ * las filas de la nube se reemplazaba todo lo que había acá. Así se perdió un
+ * día entero de pagos y de cambios de estado.
+ */
+let pendientes = [];
+
+function anotarPendiente(coleccion, id, borrado = false) {
+  pendientes = pendientes.filter((p) => !(p.coleccion === coleccion && p.id === id));
+  pendientes.push({ coleccion, id, borrado });
+  escribirLocal();
+  contarPendientes();
+}
+
+function sacarPendiente(coleccion, id) {
+  const antes = pendientes.length;
+  pendientes = pendientes.filter((p) => !(p.coleccion === coleccion && p.id === id));
+  if (pendientes.length === antes) return;
+  escribirLocal();
+  contarPendientes();
+}
+
+/** Cuántos cambios están esperando para subir. Se muestra en el encabezado. */
+function contarPendientes() {
+  estado.sync = { ...estado.sync, pendientes: pendientes.length };
+  avisar();
+}
+
 export const estado = {
   config: configVacia(),
   presupuestos: [],
@@ -193,6 +226,7 @@ function escribirLocal() {
     pedidos: estado.pedidos,
     agenda: estado.agenda,
     movimientos: estado.movimientos,
+    pendientes,
   };
   try {
     localStorage.setItem(CLAVE_DATOS, JSON.stringify(datos));
@@ -210,6 +244,8 @@ export async function iniciar() {
     COLECCIONES.forEach((c) => {
       estado[c] = Array.isArray(local[c]) ? local[c] : [];
     });
+    pendientes = Array.isArray(local.pendientes) ? local.pendientes : [];
+    contarPendientes();
   }
 
   const s = leerSesion();
@@ -257,10 +293,24 @@ export async function sincronizar() {
     }
     COLECCIONES.forEach((c, i) => {
       const filas = resto[i];
-      if (Array.isArray(filas)) estado[c] = filas.map((f) => ({ ...f.datos, id: f.id, actualizado: f.actualizado }));
+      if (!Array.isArray(filas)) return;
+      const bajadas = new Map(filas.map((f) => [f.id, { ...f.datos, id: f.id, actualizado: f.actualizado }]));
+      // Lo que todavía no subió manda sobre lo que baja: si no, la nube le
+      // pasa por encima a un pago que acá está y allá todavía no. Ver pendientes.
+      pendientes.filter((p) => p.coleccion === c).forEach((p) => {
+        if (p.borrado) {
+          bajadas.delete(p.id);
+          return;
+        }
+        const local = estado[c].find((r) => r.id === p.id);
+        if (local) bajadas.set(p.id, local);
+      });
+      estado[c] = [...bajadas.values()];
     });
 
     escribirLocal();
+    // Con la nube contestando, se reintenta lo que había quedado a medio camino.
+    await subirPendientes();
     estado.sync = {
       activa: true,
       estado: 'ok',
@@ -281,7 +331,9 @@ export async function sincronizar() {
   // acomodarlo tanto sobre lo que bajó de la nube como sobre lo que quedó acá
   // cuando no hubo señal.
   await aplicarMigraciones();
-  avisar();
+  // estado.sync se rearma entero más arriba, así que el contador de lo que
+  // falta subir se vuelve a poner acá.
+  contarPendientes();
 }
 
 /**
@@ -314,10 +366,46 @@ async function subirFila(coleccion, registro) {
       headers: { Prefer: 'resolution=merge-duplicates,return=minimal' },
       body: JSON.stringify(fila),
     });
+    sacarPendiente(coleccion, registro.id);
     estado.sync = { ...estado.sync, estado: 'ok', mensaje: 'Sincronizado con la nube', ultima: new Date().toISOString() };
   } catch (err) {
     console.error(err);
+    // Queda anotado para reintentarlo, y sobre todo para que la próxima
+    // sincronización no lo pise con lo que haya en la nube.
+    anotarPendiente(coleccion, registro.id);
     estado.sync = { ...estado.sync, estado: 'error', mensaje: `Guardado en este dispositivo, falta subir a la nube. ${err.message}` };
+  }
+}
+
+/** Marca una fila como borrada en la nube. Devuelve si pudo. */
+async function borrarFila(coleccion, id) {
+  try {
+    await pedir(`${TABLAS[coleccion]}?id=eq.${encodeURIComponent(id)}`, {
+      method: 'PATCH',
+      headers: { Prefer: 'return=minimal' },
+      body: JSON.stringify({ borrado: true, actualizado: new Date().toISOString() }),
+    });
+    sacarPendiente(coleccion, id);
+    return true;
+  } catch (err) {
+    console.error(err);
+    anotarPendiente(coleccion, id, true);
+    estado.sync = { ...estado.sync, estado: 'error', mensaje: `Borrado acá, falta sincronizar. ${err.message}` };
+    avisar();
+    return false;
+  }
+}
+
+/** Reintenta todo lo que había quedado sin subir. */
+async function subirPendientes() {
+  for (const p of [...pendientes]) {
+    if (p.borrado) {
+      await borrarFila(p.coleccion, p.id);
+      continue;
+    }
+    const item = estado[p.coleccion]?.find((r) => r.id === p.id);
+    if (item) await subirFila(p.coleccion, item);
+    else sacarPendiente(p.coleccion, p.id);
   }
 }
 
@@ -378,17 +466,7 @@ export async function borrar(coleccion, id) {
   avisar();
 
   if (!leerSesion()) return;
-  try {
-    await pedir(`${TABLAS[coleccion]}?id=eq.${encodeURIComponent(id)}`, {
-      method: 'PATCH',
-      headers: { Prefer: 'return=minimal' },
-      body: JSON.stringify({ borrado: true, actualizado: new Date().toISOString() }),
-    });
-  } catch (err) {
-    console.error(err);
-    estado.sync = { ...estado.sync, estado: 'error', mensaje: `Borrado acá, falta sincronizar. ${err.message}` };
-    avisar();
-  }
+  await borrarFila(coleccion, id);
 }
 
 export function obtener(coleccion, id) {

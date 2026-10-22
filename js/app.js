@@ -120,10 +120,18 @@ function marcarNav(activo) {
 function pintarSync() {
   const s = estado.sync;
   const caja = $('#sync');
-  caja.innerHTML = `<span class="punto punto--${s.estado}"></span><span>${esc(
-    s.estado === 'ok' ? 'En la nube' : s.estado === 'sincronizando' ? 'Sincronizando' : s.estado === 'error' ? 'Sin nube' : 'Local'
+  // Lo que se guardó acá y todavía no subió se dice en el encabezado, no solo
+  // en el globito: es lo que no hay que dejar pasar.
+  const sinSubir = Number(s.pendientes) || 0;
+  const texto = s.estado === 'ok' ? 'En la nube'
+    : s.estado === 'sincronizando' ? 'Sincronizando'
+    : s.estado === 'error' ? 'Sin nube' : 'Local';
+  caja.innerHTML = `<span class="punto punto--${sinSubir ? 'error' : s.estado}"></span><span>${esc(
+    sinSubir ? `${sinSubir} sin subir` : texto
   )}</span>`;
-  caja.title = s.mensaje;
+  caja.title = sinSubir
+    ? `${sinSubir} cambio${sinSubir === 1 ? '' : 's'} guardado${sinSubir === 1 ? '' : 's'} en este dispositivo que todavía no llegaron a la nube. Tocá acá para reintentar. ${s.mensaje}`
+    : s.mensaje;
 }
 
 async function arrancar() {
